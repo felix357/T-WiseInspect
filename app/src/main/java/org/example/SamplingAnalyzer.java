@@ -3,25 +3,44 @@
  */
 package org.example;
 
+import java.io.File;
+import java.util.LinkedHashSet;
+
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
 import org.example.common.SamplingConfig;
+import org.example.out.ResultWriter;
+import org.example.parsing.FeatureModelParser;
 
+import de.featjar.formula.structure.IFormula;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 @Command(description = "Main application for sampling.")
 public class SamplingAnalyzer {
 
-    public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.CHVATAL, 2);
+    public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.ICPL, 1);
+    public static File inputDir;
+    public static File outputDir;
 
     public static void main(String[] args) {
 
-        System.out.println("Received arguments: " + String.join(" ", args));
         CommandLine commandLine = new CommandLine(new SamplingAnalyzer());
 
         commandLine.addSubcommand(new SamplingExecutionCommand());
         int exitCode = commandLine.execute(args);
+
+        String input_file_name = inputDir.getName();
+
+        IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
+
+        String res = "";
+        LinkedHashSet<String> variables = formula.getVariableNames();
+        for (String v : variables) {
+            res = res + "variable: " + v;
+        }
+
+        ResultWriter.writeResultToFile(outputDir, res);
 
         System.exit(exitCode);
     }
