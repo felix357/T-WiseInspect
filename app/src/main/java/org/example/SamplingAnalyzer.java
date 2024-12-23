@@ -4,7 +4,10 @@
 package org.example;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -12,9 +15,17 @@ import org.example.common.SamplingConfig;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
+import de.featjar.analysis.sat4j.computation.YASA;
+import de.featjar.base.computation.Computations;
+import de.featjar.base.computation.IComputation;
+import de.featjar.formula.assignment.BooleanClause;
+import de.featjar.formula.assignment.BooleanClauseList;
+import de.featjar.formula.assignment.BooleanSolutionList;
 import de.featjar.formula.structure.IFormula;
+import de.featjar.formula.structure.term.value.Variable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import de.featjar.base.data.Result;
 
 @Command(description = "Main application for sampling.")
 public class SamplingAnalyzer {
@@ -34,14 +45,41 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
+        // TODO find booleanclauses for formula..
+        List<Variable> variables = formula.getVariables();
+
+        BooleanClause clause1 = new BooleanClause(new int[] { 1, -2 });
+        BooleanClause clause2 = new BooleanClause(new int[] { -1, 2 });
+        BooleanClause clause3 = new BooleanClause(new int[] { 3, -4 });
+
+        List<BooleanClause> clauses = new ArrayList<>();
+        clauses.add(clause1);
+        clauses.add(clause2);
+        clauses.add(clause3);
+
+        int variableCount = 4;
+        BooleanClauseList clauseList = new BooleanClauseList(clauses, variableCount);
+        IComputation<BooleanClauseList> clauseListComputation = Computations.of(clauseList);
+
         String res = "";
-        LinkedHashSet<String> variables = formula.getVariableNames();
-        for (String v : variables) {
-            res = res + "variable: " + v;
+
+        if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
+            YASA yasa = new YASA(clauseListComputation);
+            BooleanSolutionList result = yasa.compute();
+            System.out.println(result);
+            res = result.toString();
         }
+
+        /*
+         * LinkedHashSet<String> variables = formula.getVariableNames();
+         * for (String v : variables) {
+         * res = res + "variable: " + v;
+         * }
+         */
 
         ResultWriter.writeResultToFile(outputDir, res);
 
         System.exit(exitCode);
     }
+
 }
