@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.file.Files;
 import java.util.concurrent.Callable;
 
 @Command(name = "process", mixinStandardHelpOptions = true, version = "1.0", description = "An application that processes an input file, applies a sampling algorithm, and writes results to an output file.")
@@ -31,35 +30,31 @@ public class SamplingExecutionCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+
+        // Construct relevant path
+        String newPath = "app" + File.separator + "src" + File.separator
+                + "main" + File.separator + "resources" + File.separator + inputFile.getName();
+
+        File modifiedFile = new File(newPath);
+
         // 1. Input File Processing
-        if (!inputFile.exists() || !inputFile.canRead()) {
-            System.err.println("Error: The file " + inputFile.getAbsolutePath() + " does not exist or cannot be read.");
+        if (!modifiedFile.exists() || !modifiedFile.canRead()) {
+            System.err.println(
+                    "Error: The file " + modifiedFile.getAbsolutePath() + " does not exist or cannot be read.");
             return 1;
         }
 
-        System.out.println("Reading file: " + inputFile.getAbsolutePath());
-        String content = Files.readString(inputFile.toPath());
-        System.out.println("File content:\n" + content);
+        SamplingAnalyzer.inputDir = modifiedFile;
 
-        // 2. Algorithm Processing
         System.out.println("Selected algorithm: " + algorithm);
-        switch (algorithm) {
-            case YASA:
-                SamplingAnalyzer.samplingConfig.setSamplingAlgorithm(algorithm);
-                processYASA();
-                break;
-            case ICPL:
-                processICPL();
-                break;
-            case CHVATAL:
-                processChvatal();
-                break;
-        }
+        SamplingAnalyzer.samplingConfig.setSamplingAlgorithm(algorithm);
+        SamplingAnalyzer.samplingConfig.setT(2);
 
         // 3. Output Handling
         String result = "Processing result using " + algorithm + " algorithm";
         if (outputFile != null) {
             try {
+                SamplingAnalyzer.outputDir = this.outputFile;
                 writeToFile(outputFile, result);
                 System.out.println("Result written to: " + outputFile.getAbsolutePath());
             } catch (IOException e) {
@@ -71,18 +66,6 @@ public class SamplingExecutionCommand implements Callable<Integer> {
         }
 
         return 0;
-    }
-
-    private void processYASA() {
-        System.out.println("Processing with YASA sampling algorithm...");
-    }
-
-    private void processICPL() {
-        System.out.println("Processing with ICPL sampling algorithm...");
-    }
-
-    private void processChvatal() {
-        System.out.println("Processing with Chvatal sampling algorithm...");
     }
 
     private void printToConsole(String result) {
