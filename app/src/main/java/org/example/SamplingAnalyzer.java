@@ -26,6 +26,7 @@ import de.featjar.formula.structure.term.value.Variable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import de.featjar.base.data.Result;
+import de.featjar.formula.structure.FormulaNormalForm;
 
 @Command(description = "Main application for sampling.")
 public class SamplingAnalyzer {
@@ -45,21 +46,41 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
-        // TODO find booleanclauses for formula..
-        List<Variable> variables = formula.getVariables();
+        /*
+         * if (formula.isCNF()) {
+         * 
+         * } else {
+         * Result<IFormula> cnfResult = formula.toCNF();
+         * formula = cnfResult.get();
+         * }
+         * /*
+         * List<Variable> variables = formula.getVariables();
+         * int variableCount = variables.size();
+         * 
+         * List<BooleanClause> clauses = new ArrayList<>();
+         * 
+         * for (int i = 0; i < variables.size(); i++) {
+         * Variable var = variables.get(i);
+         * int[] clauseLiterals = { i + 1 };
+         * 
+         * System.out.println(var);
+         * 
+         * BooleanClause clause = new BooleanClause(clauseLiterals);
+         * clauses.add(clause);
+         * }
+         * 
+         * BooleanClauseList clauseList = new BooleanClauseList(clauses, variableCount);
+         */
 
-        BooleanClause clause1 = new BooleanClause(new int[] { 1, -2 });
-        BooleanClause clause2 = new BooleanClause(new int[] { -1, 2 });
-        BooleanClause clause3 = new BooleanClause(new int[] { 3, -4 });
+        // TODO: replace this with read in data from xml file.
+        ArrayList<BooleanClause> bc = new ArrayList<>();
+        bc.add(new BooleanClause(new int[] { 1 }));
+        bc.add(new BooleanClause(new int[] { 2, 3 }));
+        bc.add(new BooleanClause(new int[] { 4 }));
+        bc.add(new BooleanClause(new int[] { 5, 6, 7, 8 }));
 
-        List<BooleanClause> clauses = new ArrayList<>();
-        clauses.add(clause1);
-        clauses.add(clause2);
-        clauses.add(clause3);
-
-        int variableCount = 4;
-        BooleanClauseList clauseList = new BooleanClauseList(clauses, variableCount);
-        IComputation<BooleanClauseList> clauseListComputation = Computations.of(clauseList);
+        BooleanClauseList cnf = new BooleanClauseList(bc, 8);
+        IComputation<BooleanClauseList> clauseListComputation = Computations.of(cnf);
 
         String res = "";
 
@@ -69,13 +90,6 @@ public class SamplingAnalyzer {
             System.out.println(result);
             res = result.toString();
         }
-
-        /*
-         * LinkedHashSet<String> variables = formula.getVariableNames();
-         * for (String v : variables) {
-         * res = res + "variable: " + v;
-         * }
-         */
 
         ResultWriter.writeResultToFile(outputDir, res);
 
