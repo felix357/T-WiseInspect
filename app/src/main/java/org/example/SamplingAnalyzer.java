@@ -82,16 +82,14 @@ public class SamplingAnalyzer {
         BooleanClauseList cnf = new BooleanClauseList(bc, 8);
         IComputation<BooleanClauseList> clauseListComputation = Computations.of(cnf);
 
-        String res = "";
+        BooleanSolutionList result = null;
 
         if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
             YASA yasa = new YASA(clauseListComputation);
-            BooleanSolutionList result = yasa.compute();
-            System.out.println(result);
-            res = result.toString();
+            result = yasa.compute();
         }
 
-        ResultWriter.writeResultToFile(outputDir, res);
+        ResultWriter.writeResultToFile(outputDir, result, bc, 2, samplingConfig.getSamplingAlgorithm());
 
         System.exit(exitCode);
     }
