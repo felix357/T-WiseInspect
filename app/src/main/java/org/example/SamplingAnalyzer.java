@@ -4,7 +4,10 @@
 package org.example;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -12,9 +15,18 @@ import org.example.common.SamplingConfig;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
+import de.featjar.analysis.sat4j.computation.YASA;
+import de.featjar.base.computation.Computations;
+import de.featjar.base.computation.IComputation;
+import de.featjar.formula.assignment.BooleanClause;
+import de.featjar.formula.assignment.BooleanClauseList;
+import de.featjar.formula.assignment.BooleanSolutionList;
 import de.featjar.formula.structure.IFormula;
+import de.featjar.formula.structure.term.value.Variable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import de.featjar.base.data.Result;
+import de.featjar.formula.structure.FormulaNormalForm;
 
 @Command(description = "Main application for sampling.")
 public class SamplingAnalyzer {
@@ -34,14 +46,54 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
+        /*
+         * if (formula.isCNF()) {
+         * 
+         * } else {
+         * Result<IFormula> cnfResult = formula.toCNF();
+         * formula = cnfResult.get();
+         * }
+         * /*
+         * List<Variable> variables = formula.getVariables();
+         * int variableCount = variables.size();
+         * 
+         * List<BooleanClause> clauses = new ArrayList<>();
+         * 
+         * for (int i = 0; i < variables.size(); i++) {
+         * Variable var = variables.get(i);
+         * int[] clauseLiterals = { i + 1 };
+         * 
+         * System.out.println(var);
+         * 
+         * BooleanClause clause = new BooleanClause(clauseLiterals);
+         * clauses.add(clause);
+         * }
+         * 
+         * BooleanClauseList clauseList = new BooleanClauseList(clauses, variableCount);
+         */
+
+        // TODO: replace this with read in data from xml file.
+        ArrayList<BooleanClause> bc = new ArrayList<>();
+        bc.add(new BooleanClause(new int[] { 1 }));
+        bc.add(new BooleanClause(new int[] { 2, 3 }));
+        bc.add(new BooleanClause(new int[] { 4 }));
+        bc.add(new BooleanClause(new int[] { 5, 6, 7, 8 }));
+
+        BooleanClauseList cnf = new BooleanClauseList(bc, 8);
+        IComputation<BooleanClauseList> clauseListComputation = Computations.of(cnf);
+
         String res = "";
-        LinkedHashSet<String> variables = formula.getVariableNames();
-        for (String v : variables) {
-            res = res + "variable: " + v;
+
+        if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
+            YASA yasa = new YASA(clauseListComputation);
+            BooleanSolutionList result = yasa.compute();
+            System.out.println(result);
+            res = result.toString();
         }
 
         ResultWriter.writeResultToFile(outputDir, res);
 
         System.exit(exitCode);
     }
+
 }
