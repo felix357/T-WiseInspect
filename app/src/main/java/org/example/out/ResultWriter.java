@@ -5,18 +5,22 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.example.common.SamplingAlgorithm;
 
-import de.featjar.formula.assignment.BooleanClause;
+import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanClauseList;
 import de.featjar.formula.assignment.BooleanSolution;
 import de.featjar.formula.assignment.BooleanSolutionList;
 
 public class ResultWriter {
 
-    public static boolean writeResultToFile(File outputDir, BooleanSolutionList booleanSolutionList,
-            ArrayList<BooleanClause> bc, int t, SamplingAlgorithm samplingAlgorithm) {
+    public static boolean writeResultToFile(File outputDir, BooleanAssignment coreAndDeadFeatures,
+            BooleanSolutionList booleanSolutionList,
+            BooleanClauseList booleanClauseList, int t, SamplingAlgorithm samplingAlgorithm) {
 
         if (!outputDir.exists() || !outputDir.isFile()) {
             System.out.println("The provided output directory does not exist or is not a file.");
@@ -36,11 +40,13 @@ public class ResultWriter {
             writer.write("\nNumber of Samples: " + numberOfSamples);
 
             // Get relevant BooleanClauses and relevant numbers
-            ArrayList<Integer> relevantNumbers = getRelevantNumbers(bc);
 
-            writer.write("\nRelevant features: " + relevantNumbers);
+            System.out.println(booleanSolutionList);
+            ArrayList<Integer> relevantFeatures = getRelevantFeatures(booleanSolutionList, coreAndDeadFeatures);
 
-            HashMap<String, Integer> entries = determineEntriesT2(relevantNumbers);
+            writer.write("\nRelevant features: " + relevantFeatures);
+
+            HashMap<String, Integer> entries = determineEntriesT2(relevantFeatures);
 
             // Process number of solutions per interaction
             updateEntriesWithNumberOfSolutions(booleanSolutionList, entries);
@@ -110,19 +116,26 @@ public class ResultWriter {
         }
     }
 
-    private static ArrayList<Integer> getRelevantNumbers(ArrayList<BooleanClause> bc) {
-        ArrayList<Integer> relevantNumbers = new ArrayList<>();
+    private static ArrayList<Integer> getRelevantFeatures(BooleanSolutionList booleanSolutionList,
+            BooleanAssignment coreAndDeadFeatures) {
 
-        // Collect non-singleton clauses and their values
-        for (BooleanClause clause : bc) {
-            if (clause.size() != 1) {
-                int[] nonZeroValues = clause.getNonZeroValues();
-                for (int value : nonZeroValues) {
-                    relevantNumbers.add(value);
-                }
+        int[] coreAndDead = coreAndDeadFeatures.getAbsoluteValues();
+
+        int[] features = booleanSolutionList.getAll().get(0).getAbsoluteValues();
+
+        Set<Integer> coreAndDeadSet = new HashSet<>();
+        for (int num : coreAndDead) {
+            coreAndDeadSet.add(num);
+        }
+
+        ArrayList<Integer> relevantFeatures = new ArrayList<>();
+        for (int i : features) {
+            // Add to 'relevantNumbers' only if 'i' is NOT in 'coreAndDeadSet'
+            if (!coreAndDeadSet.contains(i)) {
+                relevantFeatures.add(i);
             }
         }
-        return relevantNumbers;
+        return relevantFeatures;
     }
 
 }

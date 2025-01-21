@@ -5,9 +5,7 @@ package org.example;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -15,18 +13,28 @@ import org.example.common.SamplingConfig;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
+import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
+
+import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
+import de.featjar.analysis.sat4j.computation.ComputeContradictingClauses;
+import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
+import de.featjar.analysis.sat4j.computation.ComputeIndeterminateSat4J;
 import de.featjar.analysis.sat4j.computation.YASA;
+import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.formula.assignment.BooleanClause;
+import de.featjar.base.computation.Progress;
+import de.featjar.base.data.Result;
+import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanClauseList;
 import de.featjar.formula.assignment.BooleanSolutionList;
+import de.featjar.formula.assignment.ComputeBooleanClauseList;
+import de.featjar.formula.computation.ComputeCNFFormula;
+import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.structure.IFormula;
-import de.featjar.formula.structure.term.value.Variable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import de.featjar.base.data.Result;
-import de.featjar.formula.structure.FormulaNormalForm;
 
 @Command(description = "Main application for sampling.")
 public class SamplingAnalyzer {
@@ -46,41 +54,37 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
-        /*
-         * if (formula.isCNF()) {
-         * 
-         * } else {
-         * Result<IFormula> cnfResult = formula.toCNF();
-         * formula = cnfResult.get();
-         * }
-         * /*
-         * List<Variable> variables = formula.getVariables();
-         * int variableCount = variables.size();
-         * 
-         * List<BooleanClause> clauses = new ArrayList<>();
-         * 
-         * for (int i = 0; i < variables.size(); i++) {
-         * Variable var = variables.get(i);
-         * int[] clauseLiterals = { i + 1 };
-         * 
-         * System.out.println(var);
-         * 
-         * BooleanClause clause = new BooleanClause(clauseLiterals);
-         * clauses.add(clause);
-         * }
-         * 
-         * BooleanClauseList clauseList = new BooleanClauseList(clauses, variableCount);
-         */
+        ComputeBooleanClauseList cNF = Computations.of(formula)
+                .map(ComputeNNFFormula::new)
+                .map(ComputeCNFFormula::new)
+                .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
+                .map(ComputeBooleanClauseList::new);
 
-        // TODO: replace this with read in data from xml file.
-        ArrayList<BooleanClause> bc = new ArrayList<>();
-        bc.add(new BooleanClause(new int[] { 1 }));
-        bc.add(new BooleanClause(new int[] { 2, 3 }));
-        bc.add(new BooleanClause(new int[] { 4 }));
-        bc.add(new BooleanClause(new int[] { 5, 6, 7, 8 }));
+        BooleanClauseList booleanClauseList = cNF.compute().getKey();
 
-        BooleanClauseList cnf = new BooleanClauseList(bc, 8);
-        IComputation<BooleanClauseList> clauseListComputation = Computations.of(cnf);
+        IComputation<BooleanClauseList> clauseListComputation = Computations.of(booleanClauseList);
+
+        BooleanAssignmentList atomicSets = clauseListComputation.map(ComputeAtomicSetsSAT4J::new).compute();
+
+        System.out.println(clauseListComputation);
+        System.out.println(atomicSets);
+
+        BooleanAssignment coreAndDeadFeatures = clauseListComputation.map(ComputeCoreDeadMIG::new).compute();
+        BooleanClauseList contradictingClauses = clauseListComputation.map(ComputeContradictingClauses::new).compute();
+        BooleanAssignment c = clauseListComputation.map(ComputeIndeterminateSat4J::new).compute();
+
+        System.out.println(coreAndDeadFeatures);
+        System.out.println(contradictingClauses);
+        System.out.println(c);
+
+        // TWiseCoverageComputation tWiseCoveragecomputation = new
+        // TWiseCoverageComputation(
+        // Computations.of(booleanClauseList));
+
+        // List<Object> dependencyList = new ArrayList<>();
+        // Result<CoverageStatistic> stat =
+        // tWiseCoveragecomputation.compute(dependencyList, new Progress());
+        // System.out.println(stat);
 
         BooleanSolutionList result = null;
 
@@ -89,9 +93,9 @@ public class SamplingAnalyzer {
             result = yasa.compute();
         }
 
-        ResultWriter.writeResultToFile(outputDir, result, bc, 2, samplingConfig.getSamplingAlgorithm());
+        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, result, booleanClauseList, 2,
+                samplingConfig.getSamplingAlgorithm());
 
         System.exit(exitCode);
     }
-
 }
