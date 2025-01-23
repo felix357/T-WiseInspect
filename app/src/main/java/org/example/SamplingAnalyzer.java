@@ -4,6 +4,7 @@
 package org.example;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +20,9 @@ import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeContradictingClauses;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.analysis.sat4j.computation.ComputeIndeterminateSat4J;
+import de.featjar.analysis.sat4j.computation.MIGBuilder;
 import de.featjar.analysis.sat4j.computation.YASA;
+import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
@@ -65,6 +68,8 @@ public class SamplingAnalyzer {
         IComputation<BooleanClauseList> clauseListComputation = Computations.of(booleanClauseList);
 
         BooleanAssignmentList atomicSets = clauseListComputation.map(ComputeAtomicSetsSAT4J::new).compute();
+        // TODO: dont know how this need to be initialized.
+        BooleanAssignment boolAssignment = new BooleanAssignment(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
         System.out.println(clauseListComputation);
         System.out.println(atomicSets);
@@ -77,21 +82,39 @@ public class SamplingAnalyzer {
         System.out.println(contradictingClauses);
         System.out.println(c);
 
-        // TWiseCoverageComputation tWiseCoveragecomputation = new
-        // TWiseCoverageComputation(
-        // Computations.of(booleanClauseList));
-
-        // List<Object> dependencyList = new ArrayList<>();
-        // Result<CoverageStatistic> stat =
-        // tWiseCoveragecomputation.compute(dependencyList, new Progress());
-        // System.out.println(stat);
-
         BooleanSolutionList result = null;
 
         if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
             YASA yasa = new YASA(clauseListComputation);
             result = yasa.compute();
         }
+
+        Integer tValue = 2;
+        BooleanAssignment filter = new BooleanAssignment(new int[] {});
+        Duration duration = Duration.ofMinutes(1);
+
+        MIGBuilder migBuilder = new MIGBuilder(clauseListComputation);
+        List<Object> depList = new ArrayList<>();
+        depList.add(booleanClauseList);
+        depList.add(boolAssignment);
+        ModalImplicationGraph mig = migBuilder.compute(depList, new Progress()).get();
+
+        List<Object> dependencyList = new ArrayList<>();
+        dependencyList.add(booleanClauseList);
+        dependencyList.add(boolAssignment);
+        dependencyList.add(booleanClauseList);
+        dependencyList.add(duration);
+        dependencyList.add(1234567890123456789L); // random seed.
+        dependencyList.add(tValue);
+        dependencyList.add(mig);
+        dependencyList.add(filter);
+        dependencyList.add(result);
+
+        TWiseCoverageComputation tWiseCoveragecomputation = new TWiseCoverageComputation(
+                Computations.of(booleanClauseList));
+
+        CoverageStatistic stat = tWiseCoveragecomputation.compute(dependencyList, new Progress()).get();
+        System.out.println(stat);
 
         ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, result, booleanClauseList, 2,
                 samplingConfig.getSamplingAlgorithm());
