@@ -11,19 +11,22 @@ import java.util.List;
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
 import org.example.common.SamplingConfig;
+import org.example.common.TWiseCalculator;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
 import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
-
+import de.featjar.analysis.sat4j.twise.TWiseCountComputation.CombinationList;
 import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeContradictingClauses;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
+import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.computation.ComputeIndeterminateSat4J;
 import de.featjar.analysis.sat4j.computation.MIGBuilder;
 import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
+import de.featjar.analysis.sat4j.twise.TWiseCountComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
 import de.featjar.base.computation.Progress;
@@ -57,23 +60,26 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
-        ComputeBooleanClauseList cNF = Computations.of(formula)
+        ComputeBooleanClauseList cnf = Computations.of(formula)
                 .map(ComputeNNFFormula::new)
                 .map(ComputeCNFFormula::new)
                 .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
                 .map(ComputeBooleanClauseList::new);
 
-        BooleanClauseList booleanClauseList = cNF.compute().getKey();
+        BooleanClauseList booleanClauseList = cnf.compute().getKey();
 
         IComputation<BooleanClauseList> clauseListComputation = Computations.of(booleanClauseList);
 
         BooleanAssignmentList atomicSets = clauseListComputation.map(ComputeAtomicSetsSAT4J::new).compute();
+        System.out.println(atomicSets);
         // TODO: dont know how this need to be initialized.
         BooleanAssignment boolAssignment = new BooleanAssignment(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
         System.out.println(clauseListComputation);
         System.out.println(atomicSets);
 
+        BooleanAssignment core = clauseListComputation.map(ComputeCoreSAT4J::new).compute();
+        System.out.println(core);
         BooleanAssignment coreAndDeadFeatures = clauseListComputation.map(ComputeCoreDeadMIG::new).compute();
         BooleanClauseList contradictingClauses = clauseListComputation.map(ComputeContradictingClauses::new).compute();
         BooleanAssignment c = clauseListComputation.map(ComputeIndeterminateSat4J::new).compute();
@@ -90,31 +96,37 @@ public class SamplingAnalyzer {
         }
 
         Integer tValue = 2;
-        BooleanAssignment filter = new BooleanAssignment(new int[] {});
+        BooleanAssignment variableFilter = new BooleanAssignment(new int[] {});
         Duration duration = Duration.ofMinutes(1);
+        Long randomSeed = 1234567890123456789L;
 
         MIGBuilder migBuilder = new MIGBuilder(clauseListComputation);
         List<Object> depList = new ArrayList<>();
         depList.add(booleanClauseList);
-        depList.add(boolAssignment);
-        ModalImplicationGraph mig = migBuilder.compute(depList, new Progress()).get();
+        depList.add(core);
+        ModalImplicationGraph modalImplGraph = migBuilder.compute(depList, new Progress()).get();
 
         List<Object> dependencyList = new ArrayList<>();
-        dependencyList.add(booleanClauseList);
-        dependencyList.add(boolAssignment);
-        dependencyList.add(booleanClauseList);
-        dependencyList.add(duration);
-        dependencyList.add(1234567890123456789L); // random seed.
-        dependencyList.add(tValue);
-        dependencyList.add(mig);
-        dependencyList.add(filter);
-        dependencyList.add(result);
+        dependencyList.add(booleanClauseList); // CNF clauses (check)
+        dependencyList.add(core); // core (check)
+        dependencyList.add(booleanClauseList); // ASSUMED_CLAUSE_LIST (might be wrong)
+        dependencyList.add(duration); // duration check
+        dependencyList.add(randomSeed); // randomSeed check
+        dependencyList.add(tValue); // tValue check check
+        dependencyList.add(modalImplGraph); // modalImplicationGraph (might be wrong)
+        dependencyList.add(variableFilter); // variable Filter check
+        dependencyList.add(result); // sample check
 
-        TWiseCoverageComputation tWiseCoveragecomputation = new TWiseCoverageComputation(
+        TWiseCoverageComputation tWiseCoverageComputation = new TWiseCoverageComputation(
                 Computations.of(booleanClauseList));
 
-        CoverageStatistic stat = tWiseCoveragecomputation.compute(dependencyList, new Progress()).get();
-        System.out.println(stat);
+        CoverageStatistic stat = tWiseCoverageComputation.compute(dependencyList, new Progress()).get();
+        System.out.println(stat.coverage());
+
+        List<int[]> combinations = List.of();
+        Long possibleTwiseConfigs = TWiseCalculator.computeTWiseCount(result, tValue, variableFilter, booleanClauseList,
+                combinations);
+        System.out.println(possibleTwiseConfigs);
 
         ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, result, booleanClauseList, 2,
                 samplingConfig.getSamplingAlgorithm());
