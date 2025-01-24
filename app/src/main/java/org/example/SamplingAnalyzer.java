@@ -4,9 +4,6 @@
 package org.example;
 
 import java.io.File;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -15,24 +12,15 @@ import org.example.common.TWiseCalculator;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
-import de.featjar.analysis.sat4j.twise.TWiseCoverageComputation;
-import de.featjar.analysis.sat4j.twise.TWiseCountComputation.CombinationList;
-import de.featjar.analysis.sat4j.computation.ComputeAtomicSetsSAT4J;
-import de.featjar.analysis.sat4j.computation.ComputeContradictingClauses;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
-import de.featjar.analysis.sat4j.computation.ComputeIndeterminateSat4J;
-import de.featjar.analysis.sat4j.computation.MIGBuilder;
 import de.featjar.analysis.sat4j.computation.YASA;
-import de.featjar.analysis.sat4j.solver.ModalImplicationGraph;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
-import de.featjar.analysis.sat4j.twise.TWiseCountComputation;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.computation.Progress;
-import de.featjar.base.data.Result;
+import de.featjar.base.data.Pair;
+import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
-import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.BooleanClauseList;
 import de.featjar.formula.assignment.BooleanSolutionList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
@@ -42,10 +30,10 @@ import de.featjar.formula.structure.IFormula;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-@Command(description = "Main application for sampling.")
+@Command(description = "Main application for sampling Analysis.")
 public class SamplingAnalyzer {
 
-    public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.ICPL, 1);
+    public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.YASA, 2);
     public static File inputDir;
     public static File outputDir;
 
@@ -66,70 +54,26 @@ public class SamplingAnalyzer {
                 .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
                 .map(ComputeBooleanClauseList::new);
 
-        BooleanClauseList booleanClauseList = cnf.compute().getKey();
+        Pair<BooleanClauseList, VariableMap> computedCNF = cnf.compute();
+        BooleanClauseList booleanClauseList = computedCNF.getKey();
+        VariableMap variables = computedCNF.getValue();
 
         IComputation<BooleanClauseList> clauseListComputation = Computations.of(booleanClauseList);
-
-        BooleanAssignmentList atomicSets = clauseListComputation.map(ComputeAtomicSetsSAT4J::new).compute();
-        System.out.println(atomicSets);
-        // TODO: dont know how this need to be initialized.
-        BooleanAssignment boolAssignment = new BooleanAssignment(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-
-        System.out.println(clauseListComputation);
-        System.out.println(atomicSets);
-
         BooleanAssignment core = clauseListComputation.map(ComputeCoreSAT4J::new).compute();
-        System.out.println(core);
         BooleanAssignment coreAndDeadFeatures = clauseListComputation.map(ComputeCoreDeadMIG::new).compute();
-        BooleanClauseList contradictingClauses = clauseListComputation.map(ComputeContradictingClauses::new).compute();
-        BooleanAssignment c = clauseListComputation.map(ComputeIndeterminateSat4J::new).compute();
 
-        System.out.println(coreAndDeadFeatures);
-        System.out.println(contradictingClauses);
-        System.out.println(c);
-
-        BooleanSolutionList result = null;
+        BooleanSolutionList sample = null;
 
         if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
             YASA yasa = new YASA(clauseListComputation);
-            result = yasa.compute();
+            sample = yasa.compute();
         }
 
-        Integer tValue = 2;
-        BooleanAssignment variableFilter = new BooleanAssignment(new int[] {});
-        Duration duration = Duration.ofMinutes(1);
-        Long randomSeed = 1234567890123456789L;
+        CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(booleanClauseList, core, sample,
+                samplingConfig.getT());
 
-        MIGBuilder migBuilder = new MIGBuilder(clauseListComputation);
-        List<Object> depList = new ArrayList<>();
-        depList.add(booleanClauseList);
-        depList.add(core);
-        ModalImplicationGraph modalImplGraph = migBuilder.compute(depList, new Progress()).get();
-
-        List<Object> dependencyList = new ArrayList<>();
-        dependencyList.add(booleanClauseList); // CNF clauses (check)
-        dependencyList.add(core); // core (check)
-        dependencyList.add(booleanClauseList); // ASSUMED_CLAUSE_LIST (might be wrong)
-        dependencyList.add(duration); // duration check
-        dependencyList.add(randomSeed); // randomSeed check
-        dependencyList.add(tValue); // tValue check check
-        dependencyList.add(modalImplGraph); // modalImplicationGraph (might be wrong)
-        dependencyList.add(variableFilter); // variable Filter check
-        dependencyList.add(result); // sample check
-
-        TWiseCoverageComputation tWiseCoverageComputation = new TWiseCoverageComputation(
-                Computations.of(booleanClauseList));
-
-        CoverageStatistic stat = tWiseCoverageComputation.compute(dependencyList, new Progress()).get();
-        System.out.println(stat.coverage());
-
-        List<int[]> combinations = List.of();
-        Long possibleTwiseConfigs = TWiseCalculator.computeTWiseCount(result, tValue, variableFilter, booleanClauseList,
-                combinations);
-        System.out.println(possibleTwiseConfigs);
-
-        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, result, booleanClauseList, 2,
-                samplingConfig.getSamplingAlgorithm());
+        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, sample, booleanClauseList, samplingConfig.getT(),
+                samplingConfig.getSamplingAlgorithm(), coverageStatistic, variables);
 
         System.exit(exitCode);
     }
