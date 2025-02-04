@@ -33,6 +33,8 @@ dependencies {
 
     implementation name: 'formula-analysis-sat4j-0.1.1-SNAPSHOT', ext: 'jar'
 
+    implementation name: 'de.ovgu.featureide.fm.core-3.11.1-SNAPSHOT', ext: 'jar'
+
     // formula-analysis-sat4j-0.1.1-SNAPSHOT-all
 
     // https://mvnrepository.com/artifact/org.ow2.sat4j/org.ow2.sat4j.core

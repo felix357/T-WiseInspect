@@ -4,6 +4,10 @@
 package org.example;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -27,6 +31,18 @@ import de.featjar.formula.assignment.ComputeBooleanClauseList;
 import de.featjar.formula.computation.ComputeCNFFormula;
 import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.structure.IFormula;
+import de.ovgu.featureide.fm.core.analysis.cnf.CNF;
+import de.ovgu.featureide.fm.core.analysis.cnf.LiteralSet;
+import de.ovgu.featureide.fm.core.analysis.cnf.Variables;
+import de.ovgu.featureide.fm.core.analysis.cnf.formula.FeatureModelFormula;
+import de.ovgu.featureide.fm.core.job.LongRunningWrapper;
+import de.ovgu.featureide.fm.core.job.monitor.ConsoleMonitor;
+import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.IConfigurationGenerator;
+import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.PairWiseConfigurationGenerator;
+import de.ovgu.featureide.fm.core.base.IFeatureModel;
+import de.ovgu.featureide.fm.core.base.impl.FormatManager;
+import de.ovgu.featureide.fm.core.io.manager.FeatureModelManager;
+import de.ovgu.featureide.fm.core.io.manager.FileHandler;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -67,6 +83,30 @@ public class SamplingAnalyzer {
         if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
             YASA yasa = new YASA(clauseListComputation);
             sample = yasa.compute();
+        } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.INCLING) {
+
+            /*
+             * Path fmFile = Paths.get(
+             * "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/example_input.xml"
+             * );
+             * final FileHandler<IFeatureModel> fileHandler =
+             * FeatureModelManager.getFileHandler(fmFile);
+             * if (fileHandler.getLastProblems().containsError()) {
+             * throw new
+             * IllegalArgumentException(fileHandler.getLastProblems().getErrors().get(0).
+             * error);
+             * }
+             */
+
+            List<String> varNames = variables.getVariableNames();
+            Variables v = new Variables(varNames);
+            final CNF cn = new CNF(v);
+
+            // final CNF c = new FeatureModelFormula(fileHandler.getObject()).getCNF();
+            int limit = 10;
+            IConfigurationGenerator generator = new PairWiseConfigurationGenerator(cn,
+                    limit);
+            final List<LiteralSet> result = LongRunningWrapper.runMethod(generator, new ConsoleMonitor<>());
         }
 
         CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(booleanClauseList, core, sample,
