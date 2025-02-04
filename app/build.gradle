@@ -31,24 +31,27 @@ dependencies {
     implementation 'info.picocli:picocli:4.7.6'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
 
-    implementation name: 'formula-analysis-sat4j-0.1.1-SNAPSHOT', ext: 'jar'
+    implementation name: '3formula-analysis-sat4j-0.1.1-SNAPSHOT', ext: 'jar'
 
-    // formula-analysis-sat4j-0.1.1-SNAPSHOT-all
+    implementation name: '3formula-analysis-ddnnife-0.1.0-SNAPSHOT', ext: 'jar'
 
-    // https://mvnrepository.com/artifact/org.ow2.sat4j/org.ow2.sat4j.core
+    //implementation name: 'de.ovgu.featureide.fm.core-3.11.1-SNAPSHOT', ext: 'jar'
+    implementation(name: 'de.ovgu.featureide.lib.fm-v3.11.1', ext: 'jar') {
+        transitive = false
+        exclude group: 'org.ow2.sat4j', module: 'org.ow2.sat4j.core'  // Exkludiere die von mir eingebrachte Version von sat4j-core
+    }
+
+    //feature_ide uses version: '2.3.5'
     implementation group: 'org.ow2.sat4j', name: 'org.ow2.sat4j.core', version: '2.3.6'
-
+    
     // https://mvnrepository.com/artifact/net.tascalate/net.tascalate.concurrent
     implementation group: 'net.tascalate', name: 'net.tascalate.concurrent', version: '0.9.8'
 
-
-
     //implementation name: 'formula-analysis-sat4j-0.1.1-SNAPSHOT-all', ext: 'jar'
 
-    implementation name: 'formula-0.1.1-SNAPSHOT', ext: 'jar'
+    implementation name: '3formula-0.1.1-SNAPSHOT', ext: 'jar'
 
-    implementation name: 'base-0.1.2-SNAPSHOT', ext: 'jar'
-    
+    implementation name: '3base-0.1.2-SNAPSHOT', ext: 'jar'
 }
 
 // Apply a specific Java toolchain to ease working on different environments.

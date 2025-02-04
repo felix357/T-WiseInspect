@@ -4,6 +4,8 @@
 package org.example;
 
 import java.io.File;
+import java.util.List;
+import java.util.Random;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -12,23 +14,30 @@ import org.example.common.TWiseCalculator;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 
+import de.featjar.analysis.ddnnife.solver.DdnnifeWrapper;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
 import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.base.computation.Computations;
 import de.featjar.base.computation.IComputation;
-import de.featjar.base.data.Pair;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
-import de.featjar.formula.assignment.BooleanClauseList;
-import de.featjar.formula.assignment.BooleanSolutionList;
+import de.featjar.formula.assignment.BooleanAssignmentGroups;
+import de.featjar.formula.assignment.BooleanAssignmentList;
 import de.featjar.formula.assignment.ComputeBooleanClauseList;
 import de.featjar.formula.computation.ComputeCNFFormula;
 import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.structure.IFormula;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import de.ovgu.featureide.fm.core.analysis.cnf.CNF;
+import de.ovgu.featureide.fm.core.analysis.cnf.LiteralSet;
+import de.ovgu.featureide.fm.core.analysis.cnf.Variables;
+import de.ovgu.featureide.fm.core.job.LongRunningWrapper;
+import de.ovgu.featureide.fm.core.job.monitor.ConsoleMonitor;
+import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.IConfigurationGenerator;
+import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.PairWiseConfigurationGenerator;
 
 @Command(description = "Main application for sampling Analysis.")
 public class SamplingAnalyzer {
@@ -48,31 +57,55 @@ public class SamplingAnalyzer {
 
         IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
-        ComputeBooleanClauseList cnf = Computations.of(formula)
-                .map(ComputeNNFFormula::new)
-                .map(ComputeCNFFormula::new)
-                .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
+        ComputeBooleanClauseList cnf = Computations.of(formula).map(ComputeNNFFormula::new).map(ComputeCNFFormula::new)
+                // .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
                 .map(ComputeBooleanClauseList::new);
 
-        Pair<BooleanClauseList, VariableMap> computedCNF = cnf.compute();
-        BooleanClauseList booleanClauseList = computedCNF.getKey();
-        VariableMap variables = computedCNF.getValue();
+        BooleanAssignmentList computedCNF = cnf.compute();
+        VariableMap variables = computedCNF.getVariableMap();
 
-        IComputation<BooleanClauseList> clauseListComputation = Computations.of(booleanClauseList);
-        BooleanAssignment core = clauseListComputation.map(ComputeCoreSAT4J::new).compute();
-        BooleanAssignment coreAndDeadFeatures = clauseListComputation.map(ComputeCoreDeadMIG::new).compute();
+        IComputation<BooleanAssignmentList> booleanAssignmentListComputation = Computations.of(computedCNF);
 
-        BooleanSolutionList sample = null;
+        BooleanAssignment core = booleanAssignmentListComputation.map(ComputeCoreSAT4J::new).compute();
+        BooleanAssignment coreAndDeadFeatures = booleanAssignmentListComputation.map(ComputeCoreDeadMIG::new).compute();
+
+        BooleanAssignmentList sample = null;
 
         if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
-            YASA yasa = new YASA(clauseListComputation);
+            IComputation<BooleanAssignmentList> yasa = new YASA(booleanAssignmentListComputation).set(YASA.T, 2);
             sample = yasa.compute();
+        } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.UNIFORM) {
+            BooleanAssignmentGroups booleanAssignmentGroups = new BooleanAssignmentGroups(computedCNF);
+
+            try (DdnnifeWrapper solver = new DdnnifeWrapper(booleanAssignmentGroups)) {
+                Random random = new Random();
+                Long seed = random.nextLong(Long.MAX_VALUE);
+
+                sample = solver.getRandomSolutions(13, seed).get();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.INCLING) {
+            List<String> varNames = variables.getVariableNames();
+            Variables v = new Variables(varNames);
+            final CNF cn = new CNF(v);
+
+            int limit = 10;
+            IConfigurationGenerator generator = new PairWiseConfigurationGenerator(cn,
+                    limit);
+            final List<LiteralSet> result = LongRunningWrapper.runMethod(generator, new ConsoleMonitor<>());
         }
 
-        CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(booleanClauseList, core, sample,
+        CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(computedCNF, core, sample,
+                variables,
                 samplingConfig.getT());
 
-        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, sample, booleanClauseList, samplingConfig.getT(),
+        Long a = TWiseCalculator.computeTWiseCount(sample, 2, new BooleanAssignment(new int[] {}), computedCNF,
+                List.of());
+
+        System.out.println("covered: " + a);
+
+        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, sample, samplingConfig.getT(),
                 samplingConfig.getSamplingAlgorithm(), coverageStatistic, variables);
 
         System.exit(exitCode);

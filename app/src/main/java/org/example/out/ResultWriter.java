@@ -4,22 +4,22 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.example.common.SamplingAlgorithm;
 
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
+import de.featjar.base.data.IntegerList;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
-import de.featjar.formula.assignment.BooleanClauseList;
-import de.featjar.formula.assignment.BooleanSolution;
-import de.featjar.formula.assignment.BooleanSolutionList;
+import de.featjar.formula.assignment.BooleanAssignmentList;
 
 public class ResultWriter {
 
     public static boolean writeResultToFile(File outputDir, BooleanAssignment coreAndDeadFeatures,
-            BooleanSolutionList sample,
-            BooleanClauseList booleanClauseList, int t, SamplingAlgorithm samplingAlgorithm,
+            BooleanAssignmentList sample, int t, SamplingAlgorithm samplingAlgorithm,
             CoverageStatistic coverageStatistic,
             VariableMap variableMap) {
 
@@ -38,7 +38,7 @@ public class ResultWriter {
 
             int numberOfSamples = sample.size();
 
-            writer.write("\nNumber of Samples: " + numberOfSamples);
+            writer.write("\nNumber of Configurations: " + numberOfSamples);
 
             ArrayList<Integer> features = getFeatures(sample);
 
@@ -49,15 +49,19 @@ public class ResultWriter {
             // Process number of solutions per interaction
             updateEntriesWithNumberOfSolutions(sample, entries);
 
+            long numberOfInvalidFeatures = coverageStatistic.invalid();
+
             // write coverage
             writer.write(
                     "\nT-Wise Combinations: Covered: " + coverageStatistic.covered() + "; " + "Uncovered: "
                             + coverageStatistic.uncovered()
-                            + "; " + "Invalid: " + coverageStatistic.invalid());
+                            + "; " + "Invalid: " + numberOfInvalidFeatures);
             writer.write("\nCoverage: " + coverageStatistic.coverage());
 
             // Write down all interactions and include the number of occurrences.
-            writeEntriesToFile(entries, writer);
+            writeEntriesToFile(entries, writer, numberOfInvalidFeatures);
+
+            printFeatureInteractionsCoveredExactlyOnce(entries, writer, variableMap);
 
             System.out.println("Successfully wrote to file: " + outputDir.getAbsolutePath());
             return true;
@@ -69,7 +73,7 @@ public class ResultWriter {
     }
 
     private static HashMap<String, Integer> determineEntriesT2(ArrayList<Integer> features,
-            BooleanSolutionList sample, boolean considerInvalidFeatureInteractions) {
+            BooleanAssignmentList sample, boolean considerInvalidFeatureInteractions) {
         HashMap<String, Integer> entries = new HashMap<>();
 
         for (int i = 0; i < features.size(); i++) {
@@ -101,9 +105,9 @@ public class ResultWriter {
     }
 
     // Hilfsmethode: Prüft, ob eine Kombination as features in Sample vorkommt
-    private static boolean combinationExistsInSample(BooleanSolutionList sample, int feature1,
+    private static boolean combinationExistsInSample(BooleanAssignmentList sample, int feature1,
             int feature2) {
-        for (BooleanSolution configuration : sample) {
+        for (BooleanAssignment configuration : sample) {
             if (configuration.contains(feature1) && configuration.contains(feature2)) {
                 return true;
             }
@@ -111,12 +115,18 @@ public class ResultWriter {
         return false;
     }
 
-    private static void writeEntriesToFile(HashMap<String, Integer> entries, FileWriter writer) throws IOException {
+    private static void writeEntriesToFile(HashMap<String, Integer> entries, FileWriter writer,
+            long numberOFInvalidFeatures)
+            throws IOException {
+
         // Count the number of entries by value
-        HashMap<Integer, Integer> valueCounts = new HashMap<>();
+        HashMap<Integer, Long> valueCounts = new HashMap<>();
         for (Integer value : entries.values()) {
-            valueCounts.put(value, valueCounts.getOrDefault(value, 0) + 1);
+            valueCounts.put(value, valueCounts.getOrDefault(value, (long) 0) + 1);
         }
+
+        // Reduce number of not covered features by the number of invalid features.
+        valueCounts.put(0, valueCounts.get(0) - numberOFInvalidFeatures);
 
         // Build a summary string
         StringBuilder sb = new StringBuilder();
@@ -129,9 +139,35 @@ public class ResultWriter {
         writer.write(sb.toString());
     }
 
-    private static void updateEntriesWithNumberOfSolutions(BooleanSolutionList sample,
+    private static void printFeatureInteractionsCoveredExactlyOnce(HashMap<String, Integer> entries,
+            FileWriter writer,
+            VariableMap variableMap)
+            throws IOException {
+
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("List of feature interactions covered exactly once:\n");
+
+        for (Map.Entry<String, Integer> entry : entries.entrySet()) {
+            if (entry.getValue() == 1) {
+                String key = entry.getKey();
+
+                String[] parts = key.split(",");
+                int number1 = Integer.parseInt(parts[0]);
+                int number2 = Integer.parseInt(parts[1]);
+
+                IntegerList indices = new IntegerList(Arrays.asList(number1, number2));
+                String featureInteraction = variableMap.getVariableNames(indices).toString();
+
+                stringBuilder.append(featureInteraction + ", ");
+            }
+        }
+
+        writer.write(stringBuilder.toString());
+    }
+
+    private static void updateEntriesWithNumberOfSolutions(BooleanAssignmentList sample,
             HashMap<String, Integer> entries) {
-        for (BooleanSolution config : sample) {
+        for (BooleanAssignment config : sample) {
             for (int i = 0; i < config.size(); i++) {
                 for (int j = i + 1; j < config.size(); j++) {
                     String key = config.get(i) + "," + config.get(j);
@@ -141,7 +177,7 @@ public class ResultWriter {
         }
     }
 
-    private static ArrayList<Integer> getFeatures(BooleanSolutionList booleanSolutionList) {
+    private static ArrayList<Integer> getFeatures(BooleanAssignmentList booleanSolutionList) {
         int[] features = booleanSolutionList.getAll().get(0).getAbsoluteValues();
 
         ArrayList<Integer> relevantFeatures = new ArrayList<>();
