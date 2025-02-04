@@ -5,18 +5,23 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.example.common.SamplingAlgorithm;
 
-import de.featjar.formula.assignment.BooleanClause;
+import de.featjar.analysis.sat4j.twise.CoverageStatistic;
+import de.featjar.formula.VariableMap;
+import de.featjar.formula.assignment.BooleanAssignment;
+import de.featjar.formula.assignment.BooleanClauseList;
 import de.featjar.formula.assignment.BooleanSolution;
 import de.featjar.formula.assignment.BooleanSolutionList;
 
 public class ResultWriter {
 
-    public static boolean writeResultToFile(File outputDir, BooleanSolutionList booleanSolutionList,
-            ArrayList<BooleanClause> bc, int t, SamplingAlgorithm samplingAlgorithm) {
+    public static boolean writeResultToFile(File outputDir, BooleanAssignment coreAndDeadFeatures,
+            BooleanSolutionList sample,
+            BooleanClauseList booleanClauseList, int t, SamplingAlgorithm samplingAlgorithm,
+            CoverageStatistic coverageStatistic,
+            VariableMap variableMap) {
 
         if (!outputDir.exists() || !outputDir.isFile()) {
             System.out.println("The provided output directory does not exist or is not a file.");
@@ -29,25 +34,27 @@ public class ResultWriter {
 
             writer.write("Sampling Alg: " + samplingAlgorithm + ", t = " + t);
 
-            writer.write("\n" + booleanSolutionList.toString());
+            writer.write("\nSample: " + sample.toString());
 
-            int numberOfSamples = booleanSolutionList.size();
+            int numberOfSamples = sample.size();
 
             writer.write("\nNumber of Samples: " + numberOfSamples);
 
-            // Get relevant BooleanClauses and relevant numbers
-            ArrayList<Integer> relevantNumbers = getRelevantNumbers(bc);
+            ArrayList<Integer> features = getFeatures(sample);
 
-            writer.write("\nRelevant features: " + relevantNumbers);
+            writer.write("\nFeatures: " + variableMap);
 
-            HashMap<String, Integer> entries = determineEntriesT2(relevantNumbers);
+            HashMap<String, Integer> entries = determineEntriesT2(features, sample, true);
 
             // Process number of solutions per interaction
-            updateEntriesWithNumberOfSolutions(booleanSolutionList, entries);
+            updateEntriesWithNumberOfSolutions(sample, entries);
 
-            // Calculate coverage and write it
-            double coverage = determineCoverage(entries);
-            writer.write("\nCoverage: " + coverage);
+            // write coverage
+            writer.write(
+                    "\nT-Wise Combinations: Covered: " + coverageStatistic.covered() + "; " + "Uncovered: "
+                            + coverageStatistic.uncovered()
+                            + "; " + "Invalid: " + coverageStatistic.invalid());
+            writer.write("\nCoverage: " + coverageStatistic.coverage());
 
             // Write down all interactions and include the number of occurrences.
             writeEntriesToFile(entries, writer);
@@ -61,68 +68,87 @@ public class ResultWriter {
 
     }
 
-    // determines all relevant entries for t = 2
-    private static HashMap<String, Integer> determineEntriesT2(ArrayList<Integer> relevantNumbers) {
+    private static HashMap<String, Integer> determineEntriesT2(ArrayList<Integer> features,
+            BooleanSolutionList sample, boolean considerInvalidFeatureInteractions) {
         HashMap<String, Integer> entries = new HashMap<>();
 
-        for (int i = 0; i < relevantNumbers.size(); i++) {
-            for (int j = i + 1; j < relevantNumbers.size(); j++) {
-                String a = relevantNumbers.get(i).toString() + "," + relevantNumbers.get(j).toString();
-                entries.put(a, 0);
-                String b = "-" + relevantNumbers.get(i).toString() + "," + relevantNumbers.get(j).toString();
-                entries.put(b, 0);
-                String c = relevantNumbers.get(i).toString() + "," + "-" + relevantNumbers.get(j).toString();
-                entries.put(c, 0);
-                String d = "-" + relevantNumbers.get(i).toString() + "," + "- " + relevantNumbers.get(j).toString();
-                entries.put(d, 0);
+        for (int i = 0; i < features.size(); i++) {
+            for (int j = i + 1; j < features.size(); j++) {
+                String bothTrue = features.get(i).toString() + "," + features.get(j).toString();
+                String secondTrue = "-" + features.get(i).toString() + "," + features.get(j).toString();
+                String firstTrue = features.get(i).toString() + "," + "-" + features.get(j).toString();
+                String bothFalse = "-" + features.get(i).toString() + "," + "-" + features.get(j).toString();
+
+                if (considerInvalidFeatureInteractions
+                        || combinationExistsInSample(sample, features.get(i), features.get(j))) {
+                    entries.put(bothTrue, 0);
+                }
+                if (considerInvalidFeatureInteractions
+                        || combinationExistsInSample(sample, -features.get(i), features.get(j))) {
+                    entries.put(secondTrue, 0);
+                }
+                if (considerInvalidFeatureInteractions
+                        || combinationExistsInSample(sample, features.get(i), -features.get(j))) {
+                    entries.put(firstTrue, 0);
+                }
+                if (considerInvalidFeatureInteractions
+                        || combinationExistsInSample(sample, -features.get(i), -features.get(j))) {
+                    entries.put(bothFalse, 0);
+                }
             }
         }
         return entries;
     }
 
-    private static double determineCoverage(HashMap<String, Integer> entries) {
-        AtomicInteger count = new AtomicInteger(0);
-
-        entries.forEach((key, value) -> {
-            if (value > 0) {
-                count.incrementAndGet();
+    // Hilfsmethode: Prüft, ob eine Kombination as features in Sample vorkommt
+    private static boolean combinationExistsInSample(BooleanSolutionList sample, int feature1,
+            int feature2) {
+        for (BooleanSolution configuration : sample) {
+            if (configuration.contains(feature1) && configuration.contains(feature2)) {
+                return true;
             }
-        });
-
-        return (double) count.get() / (double) entries.size();
+        }
+        return false;
     }
 
     private static void writeEntriesToFile(HashMap<String, Integer> entries, FileWriter writer) throws IOException {
+        // Count the number of entries by value
+        HashMap<Integer, Integer> valueCounts = new HashMap<>();
+        for (Integer value : entries.values()) {
+            valueCounts.put(value, valueCounts.getOrDefault(value, 0) + 1);
+        }
+
+        // Build a summary string
         StringBuilder sb = new StringBuilder();
-        entries.forEach((key, value) -> sb.append(String.format("\n%s: %d", key, value)));
+        sb.append("\nFeature interaction coverage:\n");
+        valueCounts.forEach(
+                (value, count) -> sb
+                        .append(String.format("Covered: %d Number of Feature Interactions: %d\n", value, count)));
+
+        // Write the summary to the file
         writer.write(sb.toString());
     }
 
-    private static void updateEntriesWithNumberOfSolutions(BooleanSolutionList booleanSolutionList,
+    private static void updateEntriesWithNumberOfSolutions(BooleanSolutionList sample,
             HashMap<String, Integer> entries) {
-        for (BooleanSolution solution : booleanSolutionList) {
-            for (int i = 0; i < solution.size(); i++) {
-                for (int j = i + 1; j < solution.size(); j++) {
-                    String key = solution.get(i) + "," + solution.get(j);
+        for (BooleanSolution config : sample) {
+            for (int i = 0; i < config.size(); i++) {
+                for (int j = i + 1; j < config.size(); j++) {
+                    String key = config.get(i) + "," + config.get(j);
                     entries.computeIfPresent(key, (k, v) -> v + 1);
                 }
             }
         }
     }
 
-    private static ArrayList<Integer> getRelevantNumbers(ArrayList<BooleanClause> bc) {
-        ArrayList<Integer> relevantNumbers = new ArrayList<>();
+    private static ArrayList<Integer> getFeatures(BooleanSolutionList booleanSolutionList) {
+        int[] features = booleanSolutionList.getAll().get(0).getAbsoluteValues();
 
-        // Collect non-singleton clauses and their values
-        for (BooleanClause clause : bc) {
-            if (clause.size() != 1) {
-                int[] nonZeroValues = clause.getNonZeroValues();
-                for (int value : nonZeroValues) {
-                    relevantNumbers.add(value);
-                }
-            }
+        ArrayList<Integer> relevantFeatures = new ArrayList<>();
+        for (int i : features) {
+            relevantFeatures.add(i);
         }
-        return relevantNumbers;
+        return relevantFeatures;
     }
 
 }
