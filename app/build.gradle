@@ -6,12 +6,10 @@
  */
 
 plugins {
-    // Apply the application plugin to add support for building a CLI application in Java.
     id 'application'
 }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
     mavenCentral()
 
     flatDir {
@@ -20,26 +18,18 @@ repositories {
 }
 
 dependencies {
-    // Use JUnit Jupiter for testing.
     testImplementation libs.junit.jupiter
-
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    // This dependency is used by the application.
     implementation libs.guava
 
     implementation 'info.picocli:picocli:4.7.6'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
 
-    implementation name: '3formula-analysis-sat4j-0.1.1-SNAPSHOT', ext: 'jar'
+    implementation files('libs/formula-analysis-sat4j-0.1.1-SNAPSHOT.jar')
 
-    implementation name: '3formula-analysis-ddnnife-0.1.0-SNAPSHOT', ext: 'jar'
+    implementation files('libs/formula-analysis-ddnnife-0.1.0-SNAPSHOT.jar')
 
-    //implementation name: 'de.ovgu.featureide.fm.core-3.11.1-SNAPSHOT', ext: 'jar'
-    implementation(name: 'de.ovgu.featureide.lib.fm-v3.11.1', ext: 'jar') {
-        transitive = false
-        exclude group: 'org.ow2.sat4j', module: 'org.ow2.sat4j.core'  // Exkludiere die von mir eingebrachte Version von sat4j-core
-    }
+    implementation files('libs/de.ovgu.featureide.lib.fm-v3.11.1.jar')
 
     //feature_ide uses version: '2.3.5'
     implementation group: 'org.ow2.sat4j', name: 'org.ow2.sat4j.core', version: '2.3.6'
@@ -47,14 +37,11 @@ dependencies {
     // https://mvnrepository.com/artifact/net.tascalate/net.tascalate.concurrent
     implementation group: 'net.tascalate', name: 'net.tascalate.concurrent', version: '0.9.8'
 
-    //implementation name: 'formula-analysis-sat4j-0.1.1-SNAPSHOT-all', ext: 'jar'
+    implementation files('libs/formula-0.1.1-SNAPSHOT.jar')
 
-    implementation name: '3formula-0.1.1-SNAPSHOT', ext: 'jar'
-
-    implementation name: '3base-0.1.2-SNAPSHOT', ext: 'jar'
+    implementation files('libs/base-0.1.2-SNAPSHOT.jar')
 }
 
-// Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -62,11 +49,9 @@ java {
 }
 
 application {
-    // Define the main class for the application.
     mainClass = 'org.example.App'
 }
 
 tasks.named('test') {
-    // Use JUnit Platform for unit tests.
     useJUnitPlatform()
 }
