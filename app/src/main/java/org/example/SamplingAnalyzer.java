@@ -4,6 +4,7 @@
 package org.example;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -13,6 +14,9 @@ import org.example.common.SamplingConfig;
 import org.example.common.TWiseCalculator;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
+import java.io.FileReader;
 
 import de.featjar.analysis.ddnnife.solver.DdnnifeWrapper;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
@@ -31,83 +35,190 @@ import de.featjar.formula.computation.ComputeNNFFormula;
 import de.featjar.formula.structure.IFormula;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import de.ovgu.featureide.fm.core.analysis.cnf.CNF;
-import de.ovgu.featureide.fm.core.analysis.cnf.LiteralSet;
-import de.ovgu.featureide.fm.core.analysis.cnf.Variables;
-import de.ovgu.featureide.fm.core.job.LongRunningWrapper;
-import de.ovgu.featureide.fm.core.job.monitor.ConsoleMonitor;
-import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.IConfigurationGenerator;
-import de.ovgu.featureide.fm.core.analysis.cnf.generator.configuration.PairWiseConfigurationGenerator;
+import com.google.gson.Gson;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Command(description = "Main application for sampling Analysis.")
 public class SamplingAnalyzer {
 
-    public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.YASA, 2);
-    public static File inputDir;
-    public static File outputDir;
+        public static SamplingConfig samplingConfig = new SamplingConfig(SamplingAlgorithm.YASA, 2);
+        public static File inputDir;
+        public static File outputDir;
 
-    public static void main(String[] args) {
+        public static void main(String[] args) {
+                CommandLine commandLine = new CommandLine(new SamplingAnalyzer());
 
-        CommandLine commandLine = new CommandLine(new SamplingAnalyzer());
+                commandLine.addSubcommand(new SamplingExecutionCommand());
+                int exitCode = commandLine.execute(args);
 
-        commandLine.addSubcommand(new SamplingExecutionCommand());
-        int exitCode = commandLine.execute(args);
+                String input_file_name = inputDir.getName();
 
-        String input_file_name = inputDir.getName();
+                IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
 
-        IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
+                ComputeBooleanClauseList cnf = Computations.of(formula).map(ComputeNNFFormula::new)
+                                .map(ComputeCNFFormula::new)
+                                // .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
+                                .map(ComputeBooleanClauseList::new);
 
-        ComputeBooleanClauseList cnf = Computations.of(formula).map(ComputeNNFFormula::new).map(ComputeCNFFormula::new)
-                // .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
-                .map(ComputeBooleanClauseList::new);
+                BooleanAssignmentList computedCNF = cnf.compute();
+                VariableMap variables = computedCNF.getVariableMap();
 
-        BooleanAssignmentList computedCNF = cnf.compute();
-        VariableMap variables = computedCNF.getVariableMap();
+                IComputation<BooleanAssignmentList> booleanAssignmentListComputation = Computations.of(computedCNF);
 
-        IComputation<BooleanAssignmentList> booleanAssignmentListComputation = Computations.of(computedCNF);
+                BooleanAssignment core = booleanAssignmentListComputation.map(ComputeCoreSAT4J::new).compute();
+                BooleanAssignment coreAndDeadFeatures = booleanAssignmentListComputation.map(ComputeCoreDeadMIG::new)
+                                .compute();
 
-        BooleanAssignment core = booleanAssignmentListComputation.map(ComputeCoreSAT4J::new).compute();
-        BooleanAssignment coreAndDeadFeatures = booleanAssignmentListComputation.map(ComputeCoreDeadMIG::new).compute();
+                BooleanAssignmentList sample = null;
 
-        BooleanAssignmentList sample = null;
+                if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
+                        IComputation<BooleanAssignmentList> yasa = new YASA(booleanAssignmentListComputation)
+                                        .set(YASA.T, 2);
+                        sample = yasa.compute();
+                } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.UNIFORM) {
+                        BooleanAssignmentGroups booleanAssignmentGroups = new BooleanAssignmentGroups(computedCNF);
 
-        if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
-            IComputation<BooleanAssignmentList> yasa = new YASA(booleanAssignmentListComputation).set(YASA.T, 2);
-            sample = yasa.compute();
-        } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.UNIFORM) {
-            BooleanAssignmentGroups booleanAssignmentGroups = new BooleanAssignmentGroups(computedCNF);
+                        try (DdnnifeWrapper solver = new DdnnifeWrapper(booleanAssignmentGroups)) {
+                                Random random = new Random();
+                                Long seed = random.nextLong(Long.MAX_VALUE);
 
-            try (DdnnifeWrapper solver = new DdnnifeWrapper(booleanAssignmentGroups)) {
-                Random random = new Random();
-                Long seed = random.nextLong(Long.MAX_VALUE);
+                                sample = solver.getRandomSolutions(13, seed).get();
+                        } catch (Exception e) {
+                                e.printStackTrace();
+                        }
+                } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.INCLING) {
+                        List<String> varNames = variables.getVariableNames();
 
-                sample = solver.getRandomSolutions(13, seed).get();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.INCLING) {
-            List<String> varNames = variables.getVariableNames();
-            Variables v = new Variables(varNames);
-            final CNF cn = new CNF(v);
+                        List<BooleanAssignment> booleanAssignments = computedCNF.getAll();
+                        List<int[]> assignments = SamplingAnalyzer.convertToIntArrays(booleanAssignments);
 
-            int limit = 10;
-            IConfigurationGenerator generator = new PairWiseConfigurationGenerator(cn,
-                    limit);
-            final List<LiteralSet> result = LongRunningWrapper.runMethod(generator, new ConsoleMonitor<>());
+                        Gson gson = new Gson();
+
+                        String assignmentsJson = gson.toJson(assignments);
+                        String varNamesJson = gson.toJson(varNames);
+
+                        try (FileWriter writer = new FileWriter("cnf.json")) {
+                                writer.write("{\n");
+                                writer.write("\"assignments\": " + assignmentsJson + ",\n");
+                                writer.write("\"varNames\": " + varNamesJson + "\n");
+                                writer.write("}");
+                                System.out.println("Data written to file.");
+                        } catch (IOException e) {
+                                e.printStackTrace();
+                        }
+
+                        try {
+                                String jarPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/app/libs/app-1.0.0-all.jar";
+
+                                String cnfPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/cnf.json";
+                                String resultsPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/results.json";
+
+                                ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar", jarPath,
+                                                cnfPath, resultsPath);
+                                processBuilder.inheritIO();
+
+                                Process process = processBuilder.start();
+                                int exCode = process.waitFor();
+
+                                sample = loadAssignmentsFromJson(resultsPath,
+                                                variables);
+
+                        } catch (Exception e) {
+                                e.printStackTrace();
+                        }
+
+                        // List<String> varNames = variables.getVariableNames();
+                        // Variables v = new Variables(varNames);
+                        // final CNF cn = new CNF(v);
+
+                        // int limit = 10;
+                        // IConfigurationGenerator generator = new PairWiseConfigurationGenerator(cn,
+                        // limit);
+                        // final List<LiteralSet> result = LongRunningWrapper.runMethod(generator, new
+                        // ConsoleMonitor<>());
+                }
+
+                CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(computedCNF, core,
+                                sample,
+                                variables,
+                                samplingConfig.getT());
+
+                Long a = TWiseCalculator.computeTWiseCount(sample, 2, new BooleanAssignment(new int[] {}),
+                                computedCNF,
+                                List.of());
+
+                System.out.println("covered: " + a);
+
+                ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, sample,
+                                samplingConfig.getT(),
+                                samplingConfig.getSamplingAlgorithm(), coverageStatistic, variables);
+
+                System.exit(exitCode);
         }
 
-        CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(computedCNF, core, sample,
-                variables,
-                samplingConfig.getT());
+        public static List<int[]> convertToIntArrays(List<BooleanAssignment> booleanAssignments) {
+                List<int[]> resultList = new ArrayList<>();
 
-        Long a = TWiseCalculator.computeTWiseCount(sample, 2, new BooleanAssignment(new int[] {}), computedCNF,
-                List.of());
+                // Iteriere durch alle BooleanAssignment-Objekte in der Eingabeliste
+                for (BooleanAssignment assignment : booleanAssignments) {
+                        // System.out.println(assignment);
+                        // System.out.println(assignment.simplify());
 
-        System.out.println("covered: " + a);
+                        resultList.add(assignment.simplify());
+                }
 
-        ResultWriter.writeResultToFile(outputDir, coreAndDeadFeatures, sample, samplingConfig.getT(),
-                samplingConfig.getSamplingAlgorithm(), coverageStatistic, variables);
+                return resultList;
+        }
 
-        System.exit(exitCode);
-    }
+        public static BooleanAssignmentList loadAssignmentsFromJson(String filePath, VariableMap variableMap) {
+                try (FileReader reader = new FileReader(filePath)) {
+                        // Erstelle Gson-Instanz
+                        Gson gson = new Gson();
+
+                        // Definiere den Typ für die JSON-Daten (Liste von Map-Objekten)
+                        Type listType = new TypeToken<List<Map<String, Object>>>() {
+                        }.getType();
+
+                        // Lese das JSON und konvertiere es in eine Liste von Maps
+                        List<Map<String, Object>> jsonList = gson.fromJson(reader, listType);
+
+                        // Konvertiere jede Map zu einem BooleanAssignment und sammle sie in einer Liste
+                        Collection<BooleanAssignment> booleanAssignments = jsonList.stream()
+                                        .map(entry -> {
+                                                // Hole die "literals" als List<Object>
+                                                List<Object> literalsRaw = (List<Object>) entry.get("literals");
+
+                                                // Konvertiere die Literale explizit in Integer
+                                                List<Integer> literals = literalsRaw.stream()
+                                                                .map(literal -> {
+                                                                        if (literal instanceof Double) {
+                                                                                return ((Double) literal).intValue();
+
+                                                                        } else if (literal instanceof Integer) {
+                                                                                return (Integer) literal;
+                                                                        }
+                                                                        throw new IllegalArgumentException(
+                                                                                        "Unexpected literal type: "
+                                                                                                        + literal.getClass());
+                                                                })
+                                                                .collect(Collectors.toList());
+
+                                                return new BooleanAssignment(literals);
+
+                                        })
+                                        .collect(Collectors.toList());
+                        return new BooleanAssignmentList(variableMap, booleanAssignments);
+
+                } catch (IOException e) {
+                        e.printStackTrace();
+                        return null;
+                } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                        return null;
+                }
+        }
+
 }

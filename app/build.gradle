@@ -31,9 +31,17 @@ dependencies {
 
     implementation files('libs/de.ovgu.featureide.lib.fm-v3.11.1.jar')
 
+    implementation 'com.google.code.gson:gson:2.8.8'
+
+    configurations.all {
+        resolutionStrategy {
+            force 'org.ow2.sat4j:org.ow2.sat4j.core:2.3.6'
+        }
+    }
+
     //feature_ide uses version: '2.3.5'
-    implementation group: 'org.ow2.sat4j', name: 'org.ow2.sat4j.core', version: '2.3.6'
-    
+    implementation group: 'org.ow2.sat4j', name: 'org.ow2.sat4j.core', version: '2.3.6' 
+
     // https://mvnrepository.com/artifact/net.tascalate/net.tascalate.concurrent
     implementation group: 'net.tascalate', name: 'net.tascalate.concurrent', version: '0.9.8'
 
