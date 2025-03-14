@@ -4,9 +4,6 @@
 package org.example;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -16,6 +13,8 @@ import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.FileReader;
 
 import de.featjar.analysis.ddnnife.solver.DdnnifeWrapper;
@@ -60,7 +59,6 @@ public class SamplingAnalyzer {
 
                 ComputeBooleanClauseList cnf = Computations.of(formula).map(ComputeNNFFormula::new)
                                 .map(ComputeCNFFormula::new)
-                                // .set(ComputeCNFFormula.IS_PLAISTED_GREENBAUM, Boolean.TRUE)
                                 .map(ComputeBooleanClauseList::new);
 
                 BooleanAssignmentList computedCNF = cnf.compute();
@@ -68,78 +66,31 @@ public class SamplingAnalyzer {
 
                 IComputation<BooleanAssignmentList> booleanAssignmentListComputation = Computations.of(computedCNF);
 
+                BooleanAssignmentList sample = null;
+
+                switch (samplingConfig.getSamplingAlgorithm()) {
+                        case YASA:
+                                int T = 2;
+                                sample = processYasaSampling(computedCNF, T);
+                                break;
+
+                        case UNIFORM:
+                                int numberOfSamples = 13;
+                                sample = processUniformSampling(computedCNF, numberOfSamples);
+                                break;
+
+                        case INCLING:
+                                sample = processInclingSampling(computedCNF, variables);
+                                break;
+
+                        default:
+                                System.out.println("Unsupported sampling algorithm.");
+                                break;
+                }
+
                 BooleanAssignment core = booleanAssignmentListComputation.map(ComputeCoreSAT4J::new).compute();
                 BooleanAssignment coreAndDeadFeatures = booleanAssignmentListComputation.map(ComputeCoreDeadMIG::new)
                                 .compute();
-
-                BooleanAssignmentList sample = null;
-
-                if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.YASA) {
-                        IComputation<BooleanAssignmentList> yasa = new YASA(booleanAssignmentListComputation)
-                                        .set(YASA.T, 2);
-                        sample = yasa.compute();
-                } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.UNIFORM) {
-                        BooleanAssignmentGroups booleanAssignmentGroups = new BooleanAssignmentGroups(computedCNF);
-
-                        try (DdnnifeWrapper solver = new DdnnifeWrapper(booleanAssignmentGroups)) {
-                                Random random = new Random();
-                                Long seed = random.nextLong(Long.MAX_VALUE);
-
-                                sample = solver.getRandomSolutions(13, seed).get();
-                        } catch (Exception e) {
-                                e.printStackTrace();
-                        }
-                } else if (samplingConfig.getSamplingAlgorithm() == SamplingAlgorithm.INCLING) {
-                        List<String> varNames = variables.getVariableNames();
-
-                        List<BooleanAssignment> booleanAssignments = computedCNF.getAll();
-                        List<int[]> assignments = SamplingAnalyzer.convertToIntArrays(booleanAssignments);
-
-                        Gson gson = new Gson();
-
-                        String assignmentsJson = gson.toJson(assignments);
-                        String varNamesJson = gson.toJson(varNames);
-
-                        try (FileWriter writer = new FileWriter("cnf.json")) {
-                                writer.write("{\n");
-                                writer.write("\"assignments\": " + assignmentsJson + ",\n");
-                                writer.write("\"varNames\": " + varNamesJson + "\n");
-                                writer.write("}");
-                                System.out.println("Data written to file.");
-                        } catch (IOException e) {
-                                e.printStackTrace();
-                        }
-
-                        try {
-                                String jarPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/app/libs/app-1.0.0-all.jar";
-
-                                String cnfPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/cnf.json";
-                                String resultsPath = "C:/Users/felix/Documents/uni/9. semester/projekt_feature_interactions/develop/t-wise-sampling/results.json";
-
-                                ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar", jarPath,
-                                                cnfPath, resultsPath);
-                                processBuilder.inheritIO();
-
-                                Process process = processBuilder.start();
-                                int exCode = process.waitFor();
-
-                                sample = loadAssignmentsFromJson(resultsPath,
-                                                variables);
-
-                        } catch (Exception e) {
-                                e.printStackTrace();
-                        }
-
-                        // List<String> varNames = variables.getVariableNames();
-                        // Variables v = new Variables(varNames);
-                        // final CNF cn = new CNF(v);
-
-                        // int limit = 10;
-                        // IConfigurationGenerator generator = new PairWiseConfigurationGenerator(cn,
-                        // limit);
-                        // final List<LiteralSet> result = LongRunningWrapper.runMethod(generator, new
-                        // ConsoleMonitor<>());
-                }
 
                 CoverageStatistic coverageStatistic = TWiseCalculator.computeTWiseStatistics(computedCNF, core,
                                 sample,
@@ -161,12 +112,7 @@ public class SamplingAnalyzer {
 
         public static List<int[]> convertToIntArrays(List<BooleanAssignment> booleanAssignments) {
                 List<int[]> resultList = new ArrayList<>();
-
-                // Iteriere durch alle BooleanAssignment-Objekte in der Eingabeliste
                 for (BooleanAssignment assignment : booleanAssignments) {
-                        // System.out.println(assignment);
-                        // System.out.println(assignment.simplify());
-
                         resultList.add(assignment.simplify());
                 }
 
@@ -175,23 +121,16 @@ public class SamplingAnalyzer {
 
         public static BooleanAssignmentList loadAssignmentsFromJson(String filePath, VariableMap variableMap) {
                 try (FileReader reader = new FileReader(filePath)) {
-                        // Erstelle Gson-Instanz
                         Gson gson = new Gson();
-
-                        // Definiere den Typ für die JSON-Daten (Liste von Map-Objekten)
                         Type listType = new TypeToken<List<Map<String, Object>>>() {
                         }.getType();
 
-                        // Lese das JSON und konvertiere es in eine Liste von Maps
                         List<Map<String, Object>> jsonList = gson.fromJson(reader, listType);
 
-                        // Konvertiere jede Map zu einem BooleanAssignment und sammle sie in einer Liste
                         Collection<BooleanAssignment> booleanAssignments = jsonList.stream()
                                         .map(entry -> {
-                                                // Hole die "literals" als List<Object>
                                                 List<Object> literalsRaw = (List<Object>) entry.get("literals");
 
-                                                // Konvertiere die Literale explizit in Integer
                                                 List<Integer> literals = literalsRaw.stream()
                                                                 .map(literal -> {
                                                                         if (literal instanceof Double) {
@@ -219,6 +158,83 @@ public class SamplingAnalyzer {
                         e.printStackTrace();
                         return null;
                 }
+        }
+
+        private static BooleanAssignmentList processYasaSampling(BooleanAssignmentList computedCNF, int T) {
+                IComputation<BooleanAssignmentList> yasa = new YASA(Computations.of(computedCNF)).set(YASA.T, T);
+                return yasa.compute();
+        }
+
+        private static BooleanAssignmentList processUniformSampling(BooleanAssignmentList computedCNF,
+                        int numberOfSamples) {
+                BooleanAssignmentGroups booleanAssignmentGroups = new BooleanAssignmentGroups(computedCNF);
+
+                try (DdnnifeWrapper solver = new DdnnifeWrapper(booleanAssignmentGroups)) {
+                        Random random = new Random();
+                        Long seed = random.nextLong(Long.MAX_VALUE);
+
+                        return solver.getRandomSolutions(numberOfSamples, seed).get();
+                } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                }
+        }
+
+        private static BooleanAssignmentList processInclingSampling(BooleanAssignmentList computedCNF,
+                        VariableMap variables) {
+                List<String> varNames = variables.getVariableNames();
+                List<BooleanAssignment> booleanAssignments = computedCNF.getAll();
+                List<int[]> assignments = convertToIntArrays(booleanAssignments);
+
+                writeCnfJson(assignments, varNames);
+
+                Path resultsPath = runInclingJar();
+
+                if (resultsPath != null) {
+                        return loadAssignmentsFromJson(resultsPath.toString(), variables);
+                }
+                return null;
+        }
+
+        private static void writeCnfJson(List<int[]> assignments, List<String> varNames) {
+                Gson gson = new Gson();
+                String assignmentsJson = gson.toJson(assignments);
+                String varNamesJson = gson.toJson(varNames);
+
+                try (FileWriter writer = new FileWriter("cnf.json")) {
+                        writer.write("{\n");
+                        writer.write("\"assignments\": " + assignmentsJson + ",\n");
+                        writer.write("\"varNames\": " + varNamesJson + "\n");
+                        writer.write("}");
+                        System.out.println("Data written to cnf.json.");
+                } catch (IOException e) {
+                        e.printStackTrace();
+                }
+        }
+
+        private static Path runInclingJar() {
+                try {
+                        Path basePath = Paths.get("").toAbsolutePath();
+                        Path jarPath = basePath.resolve("app/libs/app-1.0.0-all.jar").normalize();
+                        Path cnfPath = basePath.resolve("cnf.json").normalize();
+                        Path resultsPath = basePath.resolve("results.json").normalize();
+
+                        ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar",
+                                        jarPath.toString(), cnfPath.toString(), resultsPath.toString());
+                        processBuilder.inheritIO();
+
+                        Process process = processBuilder.start();
+                        int exitCode = process.waitFor();
+
+                        if (exitCode == 0) {
+                                return resultsPath;
+                        } else {
+                                System.err.println("Incling JAR execution failed with exit code: " + exitCode);
+                        }
+                } catch (Exception e) {
+                        e.printStackTrace();
+                }
+                return null;
         }
 
 }
