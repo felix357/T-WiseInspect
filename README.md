@@ -31,6 +31,7 @@ The sampling algorithm to be used. The supported algorithms are:
 #### Output Path:
 ```--output``` / ```-o```<br>
 The path to the output file where the statistics of the resulting configurations will be saved.
+
 **Example**:<br>```--output /path/to/output/statistics.txt```
 
 ### Optional Parameters
@@ -39,8 +40,15 @@ The path to the output file where the statistics of the resulting configurations
 ```--t-value``` / ```-t```<br>
 An optional parameter that specifies the number of variables for t-wise feature interactions.
 If not provided, the default value is 2.
+
 **Example**:<br> ```--t-value 3```
 
+#### Number of Configurations:
+```--configurations``` / ```-c```<br>
+This parameter defines the number of configurations for UNIFORM sampling.
+If not provided the default value is 10.
+
+**Example**:<br> ```--configurations 5```
 
 Full Command Example
 Here is an example of how to run the tool with all required parameters:
