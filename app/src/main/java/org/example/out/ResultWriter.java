@@ -44,11 +44,6 @@ public class ResultWriter {
 
             writer.write("\nFeatures: " + variableMap);
 
-            HashMap<String, Integer> entries = determineEntriesT2(features, sample, true);
-
-            // Process number of solutions per interaction
-            updateEntriesWithNumberOfSolutions(sample, entries);
-
             long numberOfInvalidFeatures = coverageStatistic.invalid();
 
             // write coverage
@@ -56,12 +51,18 @@ public class ResultWriter {
                     "\nT-Wise Combinations: Covered: " + coverageStatistic.covered() + "; " + "Uncovered: "
                             + coverageStatistic.uncovered()
                             + "; " + "Invalid: " + numberOfInvalidFeatures);
-            writer.write("\nCoverage: " + coverageStatistic.coverage());
+            writer.write("\nCoverage: " + coverageStatistic.coverage() + "\n");
 
-            // Write down all interactions and include the number of occurrences.
-            writeEntriesToFile(entries, writer, numberOfInvalidFeatures);
+            // Write down all interactions and include the number of occurrences for t = 2.
+            if (t == 2) {
+                HashMap<String, Integer> entries = determineEntriesT2(features, sample, true);
 
-            printFeatureInteractionsCoveredExactlyOnce(entries, writer, variableMap);
+                // Process number of solutions per interaction
+                updateEntriesWithNumberOfSolutions(sample, entries);
+
+                writeEntriesToFile(entries, writer, numberOfInvalidFeatures);
+                printFeatureInteractionsCoveredExactlyOnce(entries, writer, variableMap);
+            }
 
             System.out.println("Successfully wrote to file: " + outputDir.getAbsolutePath());
             return true;
@@ -130,7 +131,7 @@ public class ResultWriter {
 
         // Build a summary string
         StringBuilder sb = new StringBuilder();
-        sb.append("\nFeature interaction coverage:\n");
+        sb.append("Feature interaction coverage (t=2):\n");
         valueCounts.forEach(
                 (value, count) -> sb
                         .append(String.format("Covered: %d Number of Feature Interactions: %d\n", value, count)));
