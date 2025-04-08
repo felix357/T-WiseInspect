@@ -49,7 +49,7 @@ public class TWiseCalculator {
 
         List<Integer> s = variables.getVariableIndices();
         BooleanAssignment var = new BooleanAssignment(s);
-        TWiseCombinationsList combinationsList = new TWiseCombinationsList(var, 2);
+        TWiseCombinationsList combinationsList = new TWiseCombinationsList(var, tValue);
 
         List<Object> dependencyList = new ArrayList<>();
         dependencyList.add(booleanAssignmentList); // CNF clauses

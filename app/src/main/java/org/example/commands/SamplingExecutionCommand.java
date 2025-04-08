@@ -32,6 +32,11 @@ public class SamplingExecutionCommand implements Callable<Integer> {
             "--configurations" }, description = "The number of configurations for UNIFORM sampling.", defaultValue = "10")
     private int numberOfConfigurations;
 
+    // Optional parameter for t-value (default value: 2)
+    @Option(names = { "-t",
+            "--t-value" }, description = "The t-value for t-wise sampling (default is 2).", defaultValue = "2")
+    private int tValue;
+
     @Override
     public Integer call() throws Exception {
 
@@ -52,9 +57,12 @@ public class SamplingExecutionCommand implements Callable<Integer> {
 
         System.out.println("Selected algorithm: " + algorithm);
         SamplingAnalyzer.samplingConfig.setSamplingAlgorithm(algorithm);
-        SamplingAnalyzer.samplingConfig.setT(2);
+        SamplingAnalyzer.samplingConfig.setT(tValue);
 
-        if (algorithm == SamplingAlgorithm.UNIFORM) {
+        // set specific values of sampling config for specific SamplingAlgorithm
+        if (algorithm == SamplingAlgorithm.INCLING) {
+            SamplingAnalyzer.samplingConfig.setT(2);
+        } else if (algorithm == SamplingAlgorithm.UNIFORM) {
             SamplingAnalyzer.samplingConfig.setNumberOfConfigurations(numberOfConfigurations);
             System.out.println("Using " + numberOfConfigurations + " configurations for UNIFORM sampling.");
         }

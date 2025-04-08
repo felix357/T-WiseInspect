@@ -70,7 +70,7 @@ public class SamplingAnalyzer {
 
                 switch (samplingConfig.getSamplingAlgorithm()) {
                         case YASA:
-                                int T = 2;
+                                int T = samplingConfig.getT();
                                 sample = processYasaSampling(computedCNF, T);
                                 break;
 
@@ -97,7 +97,8 @@ public class SamplingAnalyzer {
                                 variables,
                                 samplingConfig.getT());
 
-                Long a = TWiseCalculator.computeTWiseCount(sample, 2, new BooleanAssignment(new int[] {}),
+                Long a = TWiseCalculator.computeTWiseCount(sample, samplingConfig.getT(),
+                                new BooleanAssignment(new int[] {}),
                                 computedCNF,
                                 List.of());
 
