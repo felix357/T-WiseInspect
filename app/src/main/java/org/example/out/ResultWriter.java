@@ -105,36 +105,6 @@ public class ResultWriter {
         return entries;
     }
 
-    private static HashMap<String, Integer> determineEntriesT1(ArrayList<Integer> features,
-            BooleanAssignmentList sample, boolean considerInvalidFeatureInteractions) {
-        HashMap<String, Integer> entries = new HashMap<>();
-
-        for (int i = 0; i < features.size(); i++) {
-            int feature = features.get(i);
-
-            String fatureTrue = features.get(i).toString();
-            String featureFalse = "-" + features.get(i).toString();
-
-            if (considerInvalidFeatureInteractions || combinationExistsInSample(sample, feature)) {
-                entries.put(fatureTrue, 0);
-            }
-            if (considerInvalidFeatureInteractions || combinationExistsInSample(sample, -feature)) {
-                entries.put(featureFalse, 0);
-            }
-        }
-
-        return entries;
-    }
-
-    private static boolean combinationExistsInSample(BooleanAssignmentList sample, int feature) {
-        for (BooleanAssignment assignment : sample.getAll()) {
-            if (assignment.contains(feature)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // Hilfsmethode: Prüft, ob eine Kombination as features in Sample vorkommt
     private static boolean combinationExistsInSample(BooleanAssignmentList sample, int feature1,
             int feature2) {
