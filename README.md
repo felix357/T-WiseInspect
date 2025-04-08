@@ -11,7 +11,7 @@ The **T-Wise-Sampling** tool analyzes feature models to generate representative 
 ## Setup Instructions
 1. Clone this repository: ```git clone https://github.com/felix357/t-wise-sampling.git```
 2. After cloning navigate to the project directory: ```cd t-wise-sampling```
-3. Build the project using gradle: ```./gradlew build```
+3. Build the project using gradle: ``` ./gradlew clean shadowJar```
 4. The JAR file will be located in the ```app/build/libs``` folder and will be named ```app.jar```
 5. Once the project is built, you can run the executable JAR file from the command line using Java. ```cd build/libs``` ```java -jar t-wise-sampling-1.0.jar --input-file /path/to/input.xml --sampling-algorithm YASA --output /path/to/output/statistics.txt```
 6. Ensure that you have Java 21 or later installed.
