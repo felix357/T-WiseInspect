@@ -75,8 +75,8 @@ public class SamplingAnalyzer {
                                 break;
 
                         case UNIFORM:
-                                int numberOfSamples = 13;
-                                sample = processUniformSampling(computedCNF, numberOfSamples);
+                                sample = processUniformSampling(computedCNF,
+                                                samplingConfig.getNumberOfConfigurations());
                                 break;
 
                         case INCLING:
