@@ -2,13 +2,15 @@ package org.example.parsing;
 
 import de.featjar.formula.io.FormulaFormats;
 import de.featjar.formula.structure.IFormula;
+
+import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URL;
 
 import de.featjar.base.FeatJAR;
 import de.featjar.base.computation.Cache;
 import de.featjar.base.data.Result;
 import de.featjar.base.io.IO;
-import de.featjar.base.io.format.IFormat;
 import de.featjar.base.io.format.IFormatSupplier;
 import de.featjar.base.log.CallerFormatter;
 import de.featjar.base.log.Log;
@@ -35,23 +37,28 @@ public class FeatureModelParser {
     }
 
     public static <T> T load(String modelPath, IFormatSupplier<T> formatSupplier) {
-        URL systemResource = ClassLoader.getSystemResource(modelPath);
-        if (systemResource == null) {
-            throw new RuntimeException("Datei nicht gefunden: " + modelPath);
-        }
-        Result<T> loadResult = IO.load(systemResource, formatSupplier);
-        if (!loadResult.isPresent()) {
-            throw new RuntimeException("Fehler beim Laden der Datei: " + loadResult.getProblems());
-        }
-        return loadResult.get();
-    }
+        // Try loading the file directly from the given path (absolute or relative)
+        File file = new File(modelPath);
 
-    public static <T> T load(String modelPath, IFormat<T> format) {
-        URL systemResource = ClassLoader.getSystemResource(modelPath);
-        if (systemResource == null) {
+        // Check if the file exists and is a valid file
+        if (!file.exists() || !file.isFile()) {
             throw new RuntimeException("Datei nicht gefunden: " + modelPath);
         }
-        return IO.load(systemResource, format).orElseThrow(
-                problems -> new RuntimeException("Laden fehlgeschlagen: " + problems));
+
+        try {
+            // Convert the file to URL
+            URL fileURL = file.toURI().toURL();
+
+            // Load the resource using the provided formatSupplier
+            Result<T> loadResult = IO.load(fileURL, formatSupplier);
+
+            if (!loadResult.isPresent()) {
+                throw new RuntimeException("Fehler beim Laden der Datei: " + loadResult.getProblems());
+            }
+
+            return loadResult.get();
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Ungültiger Dateipfad: " + modelPath, e);
+        }
     }
 }
