@@ -28,6 +28,10 @@ public class SamplingExecutionCommand implements Callable<Integer> {
             "--sampling-algorithm" }, description = "The sampling algorithm to use (YASA, UNIFORM, INCLING).", required = true)
     private SamplingAlgorithm algorithm;
 
+    @Option(names = { "-c",
+            "--configurations" }, description = "The number of configurations for UNIFORM sampling.", defaultValue = "10")
+    private int numberOfConfigurations;
+
     @Override
     public Integer call() throws Exception {
 
@@ -49,6 +53,11 @@ public class SamplingExecutionCommand implements Callable<Integer> {
         System.out.println("Selected algorithm: " + algorithm);
         SamplingAnalyzer.samplingConfig.setSamplingAlgorithm(algorithm);
         SamplingAnalyzer.samplingConfig.setT(2);
+
+        if (algorithm == SamplingAlgorithm.UNIFORM) {
+            SamplingAnalyzer.samplingConfig.setNumberOfConfigurations(numberOfConfigurations);
+            System.out.println("Using " + numberOfConfigurations + " configurations for UNIFORM sampling.");
+        }
 
         // 3. Output Handling
         String result = "Processing result using " + algorithm + " algorithm";
