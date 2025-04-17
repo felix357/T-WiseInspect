@@ -18,7 +18,33 @@ import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 
+/**
+ * Utility class for calculating t-wise coverage statistics in feature model
+ * sampling.
+ * <p>
+ * Provides methods to:
+ * <ul>
+ * <li>Compute the number of t-wise combinations covered by a sample</li>
+ * <li>Evaluate the overall t-wise coverage statistics of a given sample</li>
+ * </ul>
+ */
 public class TWiseCalculator {
+
+    /**
+     * Computes the number of valid t-wise combinations that are covered by the
+     * given sample.
+     *
+     * @param result            The sample containing Boolean assignments
+     *                          (configurations).
+     * @param tValue            The value of 't' (e.g., 2 for pairwise).
+     * @param variableFilter    A filter used to limit the variables included in the
+     *                          combinations.
+     * @param booleanClauseList The list of clauses representing the feature model
+     *                          in CNF.
+     * @param combinations      A list of variable index combinations to evaluate.
+     * @return The number of covered t-wise combinations that satisfy the
+     *         constraints.
+     */
     public static Long computeTWiseCount(BooleanAssignmentList result, int tValue, BooleanAssignment variableFilter,
             BooleanAssignmentList booleanClauseList, List<int[]> combinations) {
         CombinationList combinationList = CombinationList.of(combinations);
@@ -34,6 +60,22 @@ public class TWiseCalculator {
         return number;
     }
 
+    /**
+     * Computes detailed t-wise coverage statistics for a sample, including covered,
+     * uncovered, and invalid combinations.
+     *
+     * @param booleanAssignmentList The full list of feature model constraints in
+     *                              CNF.
+     * @param core                  The core assignment representing mandatory
+     *                              features.
+     * @param result                The generated sample of configurations.
+     * @param variables             The variable map for resolving feature names and
+     *                              indices.
+     * @param tValue                The desired level of interaction coverage (e.g.,
+     *                              2 for pairwise).
+     * @return A {@link CoverageStatistic} containing coverage metrics for the
+     *         sample.
+     */
     public static CoverageStatistic computeTWiseStatistics(BooleanAssignmentList booleanAssignmentList,
             BooleanAssignment core, BooleanAssignmentList result, VariableMap variables, Integer tValue) {
         BooleanAssignment variableFilter = new BooleanAssignment(new int[] {});
@@ -52,16 +94,16 @@ public class TWiseCalculator {
         TWiseCombinationsList combinationsList = new TWiseCombinationsList(var, tValue);
 
         List<Object> dependencyList = new ArrayList<>();
-        dependencyList.add(booleanAssignmentList); // CNF clauses
-        dependencyList.add(core); // core (check)
-        dependencyList.add(booleanAssignmentList); // ASSUMED_CLAUSE_LIST (might be wrong)
-        dependencyList.add(duration); // duration check
-        dependencyList.add(randomSeed); // randomSeed
-        dependencyList.add(result); // the sample that was created
-        dependencyList.add(tValue); // tValue
+        dependencyList.add(booleanAssignmentList);
+        dependencyList.add(core);
+        dependencyList.add(booleanAssignmentList); // ASSUMED_CLAUSE_LIST
+        dependencyList.add(duration);
+        dependencyList.add(randomSeed);
+        dependencyList.add(result);
+        dependencyList.add(tValue);
         dependencyList.add(combinationsList);
-        dependencyList.add(modalImplGraph); // neue api: ModalImplGraph
-        dependencyList.add(variableFilter); // Filter
+        dependencyList.add(modalImplGraph);
+        dependencyList.add(variableFilter);
 
         TWiseCoverageComputation tWiseCoverageComputation = new TWiseCoverageComputation(
                 Computations.of(booleanAssignmentList));
