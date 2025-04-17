@@ -18,8 +18,27 @@ import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 
+/**
+ * Utility class for managing input and output operations related to the Incling
+ * tool.
+ * <p>
+ * This class facilitates communication between the main application and the
+ * Incling JAR
+ * by handling the creation of JSON input files and parsing of JSON output
+ * files.
+ * It abstracts the execution process and data transformation required to
+ * interface with Incling.
+ */
 public class InclingIO {
 
+    /**
+     * Executes the Incling JAR file using expected default relative file locations
+     * and waits for it to finish.
+     * The JAR is expected to consume 'cnf.json' and produce 'results.json'.
+     *
+     * @return the {@link Path} to the results file (results.json) if the
+     *         execution was successful, otherwise null
+     */
     public static Path runInclingJar() {
         try {
             Path basePath = Paths.get("").toAbsolutePath();
@@ -45,6 +64,14 @@ public class InclingIO {
         return null;
     }
 
+    /**
+     * Loads a list of BooleanAssignments from a JSON file produced by Incling.
+     *
+     * @param filePath    the path to the results JSON file
+     * @param variableMap the {@link VariableMap} used to interpret literals
+     * @return a {@link BooleanAssignmentList} representing all configurations in
+     *         the file, or null on failure
+     */
     public static BooleanAssignmentList loadAssignmentsFromJson(String filePath, VariableMap variableMap) {
         try (FileReader reader = new FileReader(filePath)) {
             Gson gson = new Gson();
@@ -86,6 +113,13 @@ public class InclingIO {
         }
     }
 
+    /**
+     * Writes a CNF JSON file in the format expected by the Incling JAR.
+     * The file includes assignments as int arrays and variable names.
+     *
+     * @param assignments a list of int arrays representing clauses
+     * @param varNames    the list of variable names used in the feature model
+     */
     public static void writeCnfJson(List<int[]> assignments, List<String> varNames) {
         Gson gson = new Gson();
         String assignmentsJson = gson.toJson(assignments);

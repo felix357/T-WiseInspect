@@ -16,8 +16,26 @@ import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 
+/**
+ * Utility class for writing sampling results and coverage statistics
+ * to a file.
+ */
 public class ResultWriter {
 
+    /**
+     * Writes sampling results and statistics to a specified output file.
+     *
+     * @param outputDir           the output file to write to
+     * @param coreAndDeadFeatures a {@link BooleanAssignment} representing core and
+     *                            dead features
+     * @param sample              the sample result as a list of configurations
+     * @param t                   the t-value used
+     * @param samplingAlgorithm   the sampling algorithm used
+     * @param coverageStatistic   the computed coverage statistics
+     * @param variableMap         map containing feature variable names
+     * @return {@code true} if the write operation succeeded, {@code false}
+     *         otherwise
+     */
     public static boolean writeResultToFile(File outputDir, BooleanAssignment coreAndDeadFeatures,
             BooleanAssignmentList sample, int t, SamplingAlgorithm samplingAlgorithm,
             CoverageStatistic coverageStatistic,
@@ -73,6 +91,19 @@ public class ResultWriter {
 
     }
 
+    /**
+     * Computes all possible 2-wise feature combinations (positive and negative)
+     * and initializes their counts to 0.
+     *
+     * @param features                           list of features
+     * @param sample                             configurations to validate
+     *                                           combinations against
+     * @param considerInvalidFeatureInteractions if true, all combinations are
+     *                                           included
+     * @return a map of 2-wise feature interaction strings to their initial
+     *         frequency count
+     *         across configurations
+     */
     private static HashMap<String, Integer> determineEntriesT2(ArrayList<Integer> features,
             BooleanAssignmentList sample, boolean considerInvalidFeatureInteractions) {
         HashMap<String, Integer> entries = new HashMap<>();
@@ -105,7 +136,14 @@ public class ResultWriter {
         return entries;
     }
 
-    // Hilfsmethode: Prüft, ob eine Kombination as features in Sample vorkommt
+    /**
+     * Checks if a combination of two features exists in any configuration.
+     *
+     * @param sample   the list of configurations
+     * @param feature1 the first feature
+     * @param feature2 the second feature
+     * @return true if the combination exists in at least one configuration
+     */
     private static boolean combinationExistsInSample(BooleanAssignmentList sample, int feature1,
             int feature2) {
         for (BooleanAssignment configuration : sample) {
@@ -116,6 +154,14 @@ public class ResultWriter {
         return false;
     }
 
+    /**
+     * Writes the frequency of covered feature interactions to the result file.
+     *
+     * @param entries                 map of interactions and counts
+     * @param writer                  file writer to write the output
+     * @param numberOfInvalidFeatures the number of invalid features
+     * @throws IOException if writing fails
+     */
     private static void writeEntriesToFile(HashMap<String, Integer> entries, FileWriter writer,
             long numberOFInvalidFeatures)
             throws IOException {
@@ -140,6 +186,14 @@ public class ResultWriter {
         writer.write(sb.toString());
     }
 
+    /**
+     * Writes a list of feature interactions that were covered exactly once.
+     *
+     * @param entries     map of interactions and counts
+     * @param writer      file writer to write the output
+     * @param variableMap map used to resolve feature names
+     * @throws IOException if writing fails
+     */
     private static void printFeatureInteractionsCoveredExactlyOnce(HashMap<String, Integer> entries,
             FileWriter writer,
             VariableMap variableMap)
@@ -166,6 +220,13 @@ public class ResultWriter {
         writer.write(stringBuilder.toString());
     }
 
+    /**
+     * Updates the map of 2-wise feature combinations with actual occurrence counts
+     * from the sample.
+     *
+     * @param sample  the list of configurations
+     * @param entries the map of combinations to be updated
+     */
     private static void updateEntriesWithNumberOfSolutions(BooleanAssignmentList sample,
             HashMap<String, Integer> entries) {
         for (BooleanAssignment config : sample) {
@@ -178,6 +239,12 @@ public class ResultWriter {
         }
     }
 
+    /**
+     * Extracts a list of feature variable IDs from the sample.
+     *
+     * @param booleanSolutionList list of sampled configurations
+     * @return a list of integer feature IDs
+     */
     private static ArrayList<Integer> getFeatures(BooleanAssignmentList booleanSolutionList) {
         int[] features = booleanSolutionList.getAll().get(0).getAbsoluteValues();
 
