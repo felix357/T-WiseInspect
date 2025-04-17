@@ -20,12 +20,10 @@ import de.featjar.base.log.VerbosityFormatter;
 public class FeatureModelParser {
 
     public static IFormula convertXMLToFormula(String modelPath) {
-        initializeFeatJAR();
-
         return load(modelPath, FormulaFormats.getInstance());
     }
 
-    private static void initializeFeatJAR() {
+    public static void initializeFeatJAR() {
         FeatJAR.configure()
                 .log(c -> c.logToSystemOut(Log.Verbosity.MESSAGE, Log.Verbosity.INFO, Log.Verbosity.DEBUG)
                         .logToSystemErr(Log.Verbosity.ERROR, Log.Verbosity.WARNING)
