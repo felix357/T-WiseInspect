@@ -53,9 +53,7 @@ public class SamplingAnalyzer {
                 commandLine.addSubcommand(new SamplingExecutionCommand());
                 int exitCode = commandLine.execute(args);
 
-                String input_file_name = inputDir.getName();
-
-                IFormula formula = FeatureModelParser.convertXMLToFormula(input_file_name);
+                IFormula formula = FeatureModelParser.convertXMLToFormula(inputDir.toPath().toString());
 
                 ComputeBooleanClauseList cnf = Computations.of(formula).map(ComputeNNFFormula::new)
                                 .map(ComputeCNFFormula::new)

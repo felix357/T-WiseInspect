@@ -41,10 +41,7 @@ public class SamplingExecutionCommand implements Callable<Integer> {
     public Integer call() throws Exception {
 
         // Construct relevant path
-        String newPath = "app" + File.separator + "src" + File.separator
-                + "main" + File.separator + "resources" + File.separator + inputFile.getName();
-
-        File modifiedFile = new File(newPath);
+        File modifiedFile = new File(System.getProperty("user.dir"), inputFile.getName());
 
         // 1. Input File Processing
         if (!modifiedFile.exists() || !modifiedFile.canRead()) {
