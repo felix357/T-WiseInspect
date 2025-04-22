@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Random;
 
-import org.example.out.InclingIO;
+import org.example.out.FeatureIdeIO;
 
 import de.featjar.analysis.ddnnife.solver.DdnnifeWrapper;
 import de.featjar.analysis.sat4j.computation.YASA;
@@ -48,7 +48,11 @@ public class SamplingProcessor {
             case UNIFORM:
                 return processUniformSampling(computedCNF, config.getNumberOfConfigurations());
             case INCLING:
-                return processInclingSampling(computedCNF, variables);
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.INCLING, 2);
+            case ICPL:
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.ICPL, config.getT());
+            case CHVARTAL:
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.CHVARTAL, config.getT());
             default:
                 throw new UnsupportedOperationException("Unsupported sampling algorithm.");
         }
@@ -84,22 +88,26 @@ public class SamplingProcessor {
     }
 
     /**
-     * Executes external Incling sampling.
+     * Executes external FeatureIDE sampling.
      * <p>
-     * Writes the CNF to a JSON file, runs the Incling JAR, and loads the resulting
+     * Writes the CNF to a JSON file, runs the FeatureIDESampling JAR, and loads the
+     * resulting
      * configurations.
      *
-     * @param computedCNF The feature model in CNF form.
-     * @param variables   The variable map used for resolving variable names.
-     * @return A list of configurations sampled by Incling, or {@code null} if
+     * @param computedCNF       The feature model in CNF form.
+     * @param variables         The variable map used for resolving variable names.
+     * @param samplingAlgorithm The sampling algorithem to be used.
+     * @param tValue            The desired level of interaction coverage (e.g. 2
+     *                          for pairwise).
+     * @return A list of configurations sampled by FeatureIDE, or {@code null} if
      *         execution fails.
      */
-    private static BooleanAssignmentList processInclingSampling(BooleanAssignmentList computedCNF,
-            VariableMap variables) {
+    private static BooleanAssignmentList processFeatureIDESampling(BooleanAssignmentList computedCNF,
+            VariableMap variables, SamplingAlgorithm samplingAlgorithm, int tVaue) {
         List<int[]> assignments = AssignmentUtils.convertToIntArrays(computedCNF.getAll());
-        InclingIO.writeCnfJson(assignments, variables.getVariableNames());
+        FeatureIdeIO.writeCnfJson(assignments, variables.getVariableNames());
 
-        Path result = InclingIO.runInclingJar();
-        return result != null ? InclingIO.loadAssignmentsFromJson(result.toString(), variables) : null;
+        Path result = FeatureIdeIO.runFeatureIdeJar(samplingAlgorithm, tVaue);
+        return result != null ? FeatureIdeIO.loadAssignmentsFromJson(result.toString(), variables) : null;
     }
 }

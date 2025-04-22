@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.example.common.SamplingAlgorithm;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -19,35 +21,48 @@ import de.featjar.formula.assignment.BooleanAssignment;
 import de.featjar.formula.assignment.BooleanAssignmentList;
 
 /**
- * Utility class for managing input and output operations related to the Incling
- * tool.
+ * Utility class for managing input and output operations related to the
+ * FeatureIDE tool.
  * <p>
  * This class facilitates communication between the main application and the
- * Incling JAR
+ * FeatureIDE JAR
  * by handling the creation of JSON input files and parsing of JSON output
  * files.
  * It abstracts the execution process and data transformation required to
- * interface with Incling.
+ * interface with FeatureIDE.
  */
-public class InclingIO {
+public class FeatureIdeIO {
 
     /**
-     * Executes the Incling JAR file using expected default relative file locations
+     * Executes the FeatureIDE JAR file using expected default relative file
+     * locations
      * and waits for it to finish.
      * The JAR is expected to consume 'cnf.json' and produce 'results.json'.
+     * 
+     * @param samplingAlgorithm The sampling algorithem to be used.
+     * @param tValue            The desired level of interaction coverage (e.g. 2
+     *                          for pairwise).
      *
      * @return the {@link Path} to the results file (results.json) if the
      *         execution was successful, otherwise null
      */
-    public static Path runInclingJar() {
+    public static Path runFeatureIdeJar(SamplingAlgorithm samplingAlgorithm, int tVaue) {
         try {
             Path basePath = Paths.get("").toAbsolutePath();
             Path jarPath = basePath.resolve("app/libs/app-1.0.0-all.jar").normalize();
             Path cnfPath = basePath.resolve("cnf.json").normalize();
             Path resultsPath = basePath.resolve("results.json").normalize();
+            String sampler = samplingAlgorithm.toString();
+            String tValue = null;
+            try {
+                tValue = Integer.toString(tVaue);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
             ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar",
-                    jarPath.toString(), cnfPath.toString(), resultsPath.toString());
+                    jarPath.toString(), cnfPath.toString(), resultsPath.toString(), sampler.toString(),
+                    tValue.toString());
             processBuilder.inheritIO();
 
             Process process = processBuilder.start();
@@ -56,7 +71,7 @@ public class InclingIO {
             if (exitCode == 0) {
                 return resultsPath;
             } else {
-                System.err.println("Incling JAR execution failed with exit code: " + exitCode);
+                System.err.println("FeatureIDE JAR execution failed with exit code: " + exitCode);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -65,7 +80,7 @@ public class InclingIO {
     }
 
     /**
-     * Loads a list of BooleanAssignments from a JSON file produced by Incling.
+     * Loads a list of BooleanAssignments from a JSON file produced by FeatureIDE.
      *
      * @param filePath    the path to the results JSON file
      * @param variableMap the {@link VariableMap} used to interpret literals
@@ -114,7 +129,7 @@ public class InclingIO {
     }
 
     /**
-     * Writes a CNF JSON file in the format expected by the Incling JAR.
+     * Writes a CNF JSON file in the format expected by the FeatureIDE JAR.
      * The file includes assignments as int arrays and variable names.
      *
      * @param assignments a list of int arrays representing clauses
