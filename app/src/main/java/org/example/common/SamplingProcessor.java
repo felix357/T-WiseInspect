@@ -2,13 +2,13 @@ package org.example.common;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Random;
 
 import org.example.out.FeatureIdeIO;
 
 import de.featjar.analysis.ddnnife.solver.DdnnifeWrapper;
 import de.featjar.analysis.sat4j.computation.YASA;
 import de.featjar.base.computation.Computations;
+import de.featjar.base.data.IntegerList;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignmentGroups;
 import de.featjar.formula.assignment.BooleanAssignmentList;
@@ -44,15 +44,18 @@ public class SamplingProcessor {
             VariableMap variables) {
         switch (config.getSamplingAlgorithm()) {
             case YASA:
-                return processYasaSampling(computedCNF, config.getT());
+                return processYasaSampling(computedCNF, config.getT(), config.getNumberOfConfigurations());
             case UNIFORM:
                 return processUniformSampling(computedCNF, config.getNumberOfConfigurations());
             case INCLING:
-                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.INCLING, 2);
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.INCLING, 2,
+                        config.getNumberOfConfigurations());
             case ICPL:
-                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.ICPL, config.getT());
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.ICPL, config.getT(),
+                        config.getNumberOfConfigurations());
             case CHVARTAL:
-                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.CHVARTAL, config.getT());
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.CHVARTAL, config.getT(),
+                        config.getNumberOfConfigurations());
             default:
                 throw new UnsupportedOperationException("Unsupported sampling algorithm.");
         }
@@ -65,8 +68,12 @@ public class SamplingProcessor {
      * @param T           The t-value (e.g., 2 for pairwise feature interactions).
      * @return A list of configurations satisfying t-wise coverage.
      */
-    private static BooleanAssignmentList processYasaSampling(BooleanAssignmentList computedCNF, int T) {
-        return new YASA(Computations.of(computedCNF)).set(YASA.T, T).compute();
+    private static BooleanAssignmentList processYasaSampling(BooleanAssignmentList computedCNF, int T,
+            int configLimit) {
+        return new YASA(Computations.of(computedCNF))
+                .set(YASA.T, new IntegerList(T))
+                .set(YASA.CONFIGURATION_LIMIT, configLimit)
+                .compute();
     }
 
     /**
@@ -81,7 +88,8 @@ public class SamplingProcessor {
             int numberOfSamples) {
         BooleanAssignmentGroups groups = new BooleanAssignmentGroups(computedCNF);
         try (DdnnifeWrapper solver = new DdnnifeWrapper(groups)) {
-            return solver.getRandomSolutions(numberOfSamples, new Random().nextLong()).get();
+            long random_seed = 100;
+            return solver.getRandomSolutions(numberOfSamples, random_seed).get();
         } catch (Exception e) {
             throw new RuntimeException("Uniform sampling failed", e);
         }
@@ -103,11 +111,11 @@ public class SamplingProcessor {
      *         execution fails.
      */
     private static BooleanAssignmentList processFeatureIDESampling(BooleanAssignmentList computedCNF,
-            VariableMap variables, SamplingAlgorithm samplingAlgorithm, int tVaue) {
+            VariableMap variables, SamplingAlgorithm samplingAlgorithm, int tVaue, int configLimit) {
         List<int[]> assignments = AssignmentUtils.convertToIntArrays(computedCNF.getAll());
         FeatureIdeIO.writeCnfJson(assignments, variables.getVariableNames());
 
-        Path result = FeatureIdeIO.runFeatureIdeJar(samplingAlgorithm, tVaue);
+        Path result = FeatureIdeIO.runFeatureIdeJar(samplingAlgorithm, tVaue, configLimit);
         return result != null ? FeatureIdeIO.loadAssignmentsFromJson(result.toString(), variables) : null;
     }
 }

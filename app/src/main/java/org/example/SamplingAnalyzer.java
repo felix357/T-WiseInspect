@@ -1,6 +1,8 @@
 package org.example;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
 
 import org.example.commands.SamplingExecutionCommand;
 import org.example.common.SamplingAlgorithm;
@@ -10,7 +12,6 @@ import org.example.common.TWiseCalculator;
 import org.example.out.ResultWriter;
 import org.example.parsing.FeatureModelParser;
 import de.featjar.analysis.sat4j.computation.ComputeCoreDeadMIG;
-import de.featjar.analysis.sat4j.computation.ComputeCoreSAT4J;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
 import de.featjar.base.computation.Computations;
 import de.featjar.formula.VariableMap;
@@ -43,6 +44,8 @@ public class SamplingAnalyzer {
         public static File inputDir;
         // Output directory where result files will be written.
         public static File outputDir;
+        // Flag indicating whether a CSV report should be generated
+        public static boolean writeCsv = false;
 
         /**
          * Entry point of the application.
@@ -70,18 +73,31 @@ public class SamplingAnalyzer {
 
                 // Perform sampling using configured algorithm
                 BooleanAssignmentList sample = SamplingProcessor.process(samplingConfig, computedCNF, variables);
+                List<BooleanAssignment> assignments = sample.getAll();
+
+                if (SamplingAnalyzer.writeCsv) {
+                        try {
+                                ResultWriter.writeBatchSummaries(assignments, variables, computedCNF, samplingConfig,
+                                                sample,
+                                                new File("results.csv"));
+                        } catch (IOException e) {
+                                e.printStackTrace();
+                        }
+                }
+
+                CoverageStatistic statistic = TWiseCalculator.computeTWiseStatistics(sample,
+                                computedCNF,
+                                samplingConfig);
 
                 // Compute core features
-                BooleanAssignment core = Computations.of(computedCNF).map(ComputeCoreSAT4J::new).compute();
                 BooleanAssignment coreAndDead = Computations.of(computedCNF).map(ComputeCoreDeadMIG::new).compute();
 
-                // Calculate coverage statistics
-                CoverageStatistic coverage = TWiseCalculator.computeTWiseStatistics(computedCNF, core, sample,
-                                variables, samplingConfig.getT());
-
                 // Write results to output directory
-                ResultWriter.writeResultToFile(outputDir, coreAndDead, sample, samplingConfig.getT(),
-                                samplingConfig.getSamplingAlgorithm(), coverage, variables);
+                ResultWriter.writeResultToFile(outputDir,
+                                coreAndDead, sample,
+                                samplingConfig.getT(),
+                                samplingConfig.getSamplingAlgorithm(), statistic, variables);
+
                 System.exit(exitCode);
         }
 }
