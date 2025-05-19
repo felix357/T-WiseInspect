@@ -60,10 +60,17 @@ If not provided, the default value is 2.
 
 #### Number of Configurations:
 ```--configurations``` / ```-c```<br>
-This parameter defines the number of configurations for UNIFORM sampling.
-If not provided the default value is 10.
+This parameter defines the maximum number of configurations for all samplers.
+If not provided the default value is 10000.
 
 **Example**:<br> ```--configurations 5```
+
+#### CSV Summary Report:
+```--csv```<br>
+If this flag is provided, the tool will generate a results.csv file containing t-wise coverage statistics and exactly-once interaction coverage counts across multiple sample sizes.
+This CSV report can help in analyzing how coverage evolves with increasing sample sizes.
+
+**Example**:<br> ```--csv```
 
 Full Command Example
 Here is an example of how to run the tool with all required parameters:

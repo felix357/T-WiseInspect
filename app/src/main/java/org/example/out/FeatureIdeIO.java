@@ -46,7 +46,7 @@ public class FeatureIdeIO {
      * @return the {@link Path} to the results file (results.json) if the
      *         execution was successful, otherwise null
      */
-    public static Path runFeatureIdeJar(SamplingAlgorithm samplingAlgorithm, int tVaue) {
+    public static Path runFeatureIdeJar(SamplingAlgorithm samplingAlgorithm, int tVaue, int configLimit) {
         try {
             Path basePath = Paths.get("").toAbsolutePath();
             Path jarPath = basePath.resolve("app/libs/app-1.0.0-all.jar").normalize();
@@ -54,15 +54,17 @@ public class FeatureIdeIO {
             Path resultsPath = basePath.resolve("results.json").normalize();
             String sampler = samplingAlgorithm.toString();
             String tValue = null;
+            String limit = null;
             try {
                 tValue = Integer.toString(tVaue);
+                limit = Integer.toString(configLimit);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
             ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar",
                     jarPath.toString(), cnfPath.toString(), resultsPath.toString(), sampler.toString(),
-                    tValue.toString());
+                    tValue.toString(), limit.toString());
             processBuilder.inheritIO();
 
             Process process = processBuilder.start();

@@ -6,11 +6,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.example.common.SamplingAlgorithm;
+import org.example.common.SamplingConfig;
+import org.example.common.TWiseCalculator;
 
+import de.featjar.analysis.sat4j.twise.ConstraintedCoverageComputation;
 import de.featjar.analysis.sat4j.twise.CoverageStatistic;
+import de.featjar.base.computation.Computations;
 import de.featjar.base.data.IntegerList;
 import de.featjar.formula.VariableMap;
 import de.featjar.formula.assignment.BooleanAssignment;
@@ -80,15 +86,74 @@ public class ResultWriter {
 
                 writeEntriesToFile(entries, writer, numberOfInvalidFeatures);
                 printFeatureInteractionsCoveredExactlyOnce(entries, writer, variableMap);
+
+                int exactlyOnceCount = countInteractionsCoveredExactlyOnce(entries);
+                writer.write("Number of interactions covered exactly once: " + exactlyOnceCount + "\n");
+                return true;
             }
 
             System.out.println("Successfully wrote to file: " + outputDir.getAbsolutePath());
-            return true;
+            return false;
         } catch (IOException e) {
             System.err.println("Failed to write to file: " + e.getMessage());
             return false;
         }
 
+    }
+
+    private static int countInteractionsCoveredExactlyOnce(HashMap<String, Integer> entries) {
+        int count = 0;
+        for (Map.Entry<String, Integer> entry : entries.entrySet()) {
+            if (entry.getValue() == 1) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Writes a single summary line in CSV format to the given CSV file.
+     *
+     * @param csvFile           the CSV file to append to
+     * @param samplingAlgorithm the name of the sampling algorithm
+     * @param t                 the t-wise interaction level
+     * @param numberOfSamples   number of configurations in the sample
+     * @param coverageStatistic coverage statistics
+     * @return true if the write succeeded, false otherwise
+     */
+    private static boolean writeSummaryToCSV(File csvFile,
+            SamplingAlgorithm samplingAlgorithm,
+            int t,
+            int numberOfSamples,
+            CoverageStatistic coverageStatistic,
+            int exactlyOnceCount) {
+
+        boolean fileExists = csvFile.exists();
+        try (FileWriter csvWriter = new FileWriter(csvFile, true)) {
+
+            // Write header only if file is new
+            if (!fileExists) {
+                csvWriter.write(
+                        "Sampler,t,Num_Configs,Total_Covered_Twise,Uncovered_Twise,Invalid_Twise,Coverage,Covered_Exactly_Once,Num_Configs_in_Percent\n");
+            }
+
+            String line = String.format(Locale.US, "%s,%d,%d,%d,%d,%d,%.4f,%d\n",
+                    samplingAlgorithm,
+                    t,
+                    numberOfSamples,
+                    coverageStatistic.covered(),
+                    coverageStatistic.uncovered(),
+                    coverageStatistic.invalid(),
+                    coverageStatistic.coverage(),
+                    exactlyOnceCount);
+
+            csvWriter.write(line);
+
+            return true;
+        } catch (IOException e) {
+            System.err.println("Failed to write summary CSV: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -253,6 +318,97 @@ public class ResultWriter {
             relevantFeatures.add(i);
         }
         return relevantFeatures;
+    }
+
+    /**
+     * Determines the number of feature interactions (for t=2) that are covered
+     * exactly once in the provided sample of Boolean assignments.
+     * <p>
+     * This is useful for evaluating the uniqueness of interaction coverage within
+     * a sampled configuration set, in the context of t-wise testing.
+     *
+     * @param sample the list of Boolean assignments representing sampled
+     *               configurations
+     * @return the number of pairwise feature interactions that are covered exactly
+     *         once
+     */
+    private static int determineExactlyOnceCount(BooleanAssignmentList sample) {
+        ArrayList<Integer> features = ResultWriter.getFeatures(sample);
+        HashMap<String, Integer> entries = ResultWriter.determineEntriesT2(features, sample, true);
+        ResultWriter.updateEntriesWithNumberOfSolutions(sample, entries);
+        int exactlyOnceCount = ResultWriter.countInteractionsCoveredExactlyOnce(entries);
+        return exactlyOnceCount;
+    }
+
+    /**
+     * Writes a batch of summary statistics for subsets of sampled configurations to
+     * a CSV file.
+     * <p>
+     * This method evaluates the t-wise interaction coverage for multiple subset
+     * sizes
+     * (2, 5, 10, 25, 50, 75, 100) from the given list of assignments, computes
+     * statistics
+     * such as total coverage and interactions covered exactly once, and writes the
+     * results
+     * incrementally to the specified CSV file. After processing the subsets, it
+     * also computes
+     * and writes the statistics for the full sample.
+     *
+     * @param assignments    the full list of sampled configurations
+     * @param variableMap    the variable map used to construct
+     *                       BooleanAssignmentList subsets
+     * @param computedCNF    the CNF representation used for coverage computation
+     * @param samplingConfig the sampling configuration, including the sampling
+     *                       algorithm and t-value
+     * @param sample         the complete sample for which full statistics should be
+     *                       computed
+     * @param outputCsv      the CSV file where results should be written
+     * @throws IOException if an I/O error occurs during writing to the CSV file
+     */
+    public static void writeBatchSummaries(
+            List<BooleanAssignment> assignments,
+            VariableMap variableMap,
+            BooleanAssignmentList computedCNF,
+            SamplingConfig samplingConfig,
+            BooleanAssignmentList sample,
+            File outputCsv) throws IOException {
+
+        int[] sizes = { 2, 5, 10, 25, 50, 75, 100 };
+
+        for (int size : sizes) {
+            List<BooleanAssignment> firstN = assignments.subList(0, Math.min(size, assignments.size()));
+            BooleanAssignmentList firstNList = new BooleanAssignmentList(variableMap, firstN);
+
+            CoverageStatistic statistic = Computations.of(firstNList)
+                    .map(ConstraintedCoverageComputation::new)
+                    .set(ConstraintedCoverageComputation.BOOLEAN_CLAUSE_LIST, computedCNF)
+                    .set(ConstraintedCoverageComputation.T, new IntegerList(samplingConfig.getT()))
+                    .compute();
+
+            int exactlyOnceCount = determineExactlyOnceCount(firstNList);
+
+            writeSummaryToCSV(
+                    outputCsv,
+                    samplingConfig.getSamplingAlgorithm(),
+                    samplingConfig.getT(),
+                    firstNList.size(),
+                    statistic,
+                    exactlyOnceCount);
+
+            if (assignments.size() <= size) {
+                return;
+            }
+        }
+        CoverageStatistic statistic = TWiseCalculator.computeTWiseStatistics(sample, computedCNF, samplingConfig);
+        int exactlyOnceCount = determineExactlyOnceCount(sample);
+
+        writeSummaryToCSV(
+                outputCsv,
+                samplingConfig.getSamplingAlgorithm(),
+                samplingConfig.getT(),
+                sample.size(),
+                statistic,
+                exactlyOnceCount);
     }
 
 }

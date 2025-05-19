@@ -42,13 +42,17 @@ public class SamplingExecutionCommand implements Callable<Integer> {
 
     // Number of configurations to generate for UNIFORM sampling.
     @Option(names = { "-c",
-            "--configurations" }, description = "The number of configurations for UNIFORM sampling.", defaultValue = "10")
+            "--configurations" }, description = "The number of configurations for UNIFORM sampling.", defaultValue = "10000")
     private int numberOfConfigurations;
 
     // Optional parameter for t-value (default value: 2)
     @Option(names = { "-t",
             "--t-value" }, description = "The t-value for t-wise sampling (default is 2).", defaultValue = "2")
     private int tValue;
+
+    // Optional flag to write CSV summaries
+    @Option(names = { "-csv" }, description = "If set, writes CSV summary output to 'results.csv'.")
+    private boolean writeCsv;
 
     /**
      * Executes the sampling process and initializes the {@link SamplingAnalyzer}
@@ -74,14 +78,15 @@ public class SamplingExecutionCommand implements Callable<Integer> {
         System.out.println("Selected algorithm: " + algorithm);
         SamplingAnalyzer.samplingConfig.setSamplingAlgorithm(algorithm);
         SamplingAnalyzer.samplingConfig.setT(tValue);
+        SamplingAnalyzer.writeCsv = writeCsv;
 
         // set specific values of sampling config for specific SamplingAlgorithm
         if (algorithm == SamplingAlgorithm.INCLING) {
             SamplingAnalyzer.samplingConfig.setT(2);
-        } else if (algorithm == SamplingAlgorithm.UNIFORM) {
-            SamplingAnalyzer.samplingConfig.setNumberOfConfigurations(numberOfConfigurations);
-            System.out.println("Using " + numberOfConfigurations + " configurations for UNIFORM sampling.");
         }
+
+        SamplingAnalyzer.samplingConfig.setNumberOfConfigurations(numberOfConfigurations);
+        System.out.println("Using " + numberOfConfigurations + " as maximum number of configurations");
 
         // 3. Output Handling
         String result = "Processing result using " + algorithm + " algorithm";
