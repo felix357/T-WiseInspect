@@ -2,6 +2,7 @@ package org.example.common;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Random;
 
 import org.example.out.FeatureIdeIO;
 
@@ -70,9 +71,12 @@ public class SamplingProcessor {
      */
     private static BooleanAssignmentList processYasaSampling(BooleanAssignmentList computedCNF, int T,
             int configLimit) {
+        Random random = new Random();
+        long randomSeed = random.nextLong();
         return new YASA(Computations.of(computedCNF))
                 .set(YASA.T, new IntegerList(T))
                 .set(YASA.CONFIGURATION_LIMIT, configLimit)
+                .set(YASA.RANDOM_SEED, randomSeed)
                 .compute();
     }
 
@@ -88,8 +92,9 @@ public class SamplingProcessor {
             int numberOfSamples) {
         BooleanAssignmentGroups groups = new BooleanAssignmentGroups(computedCNF);
         try (DdnnifeWrapper solver = new DdnnifeWrapper(groups)) {
-            long random_seed = 100;
-            return solver.getRandomSolutions(numberOfSamples, random_seed).get();
+            Random random = new Random();
+            long randomSeed = random.nextLong();
+            return solver.getRandomSolutions(numberOfSamples, randomSeed).get();
         } catch (Exception e) {
             throw new RuntimeException("Uniform sampling failed", e);
         }
