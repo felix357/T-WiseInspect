@@ -54,8 +54,8 @@ public class SamplingProcessor {
             case ICPL:
                 return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.ICPL, config.getT(),
                         config.getNumberOfConfigurations());
-            case CHVARTAL:
-                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.CHVARTAL, config.getT(),
+            case CHVATAL:
+                return processFeatureIDESampling(computedCNF, variables, SamplingAlgorithm.CHVATAL, config.getT(),
                         config.getNumberOfConfigurations());
             default:
                 throw new UnsupportedOperationException("Unsupported sampling algorithm.");

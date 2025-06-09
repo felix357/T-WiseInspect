@@ -9,7 +9,7 @@ package org.example.common;
  *
  * <ul>
  * <li>{@link #ICPL} – ICPL algorithm.</li>
- * <li>{@link #CHVARTAL} – CHVARTAL algorithm.</li>
+ * <li>{@link #CHVATAL} – CHVATAL algorithm.</li>
  * <li>{@link #YASA} – YASA algorithm.</li>
  * <li>{@link #UNIFORM} – Uniform random sampling.</li>
  * <li>{@link #INCLING} – Incling algorithm.</li>
@@ -19,7 +19,7 @@ package org.example.common;
  */
 public enum SamplingAlgorithm {
     ICPL,
-    CHVARTAL,
+    CHVATAL,
     YASA,
     UNIFORM,
     INCLING

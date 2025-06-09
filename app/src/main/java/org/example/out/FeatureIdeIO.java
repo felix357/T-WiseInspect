@@ -49,7 +49,7 @@ public class FeatureIdeIO {
     public static Path runFeatureIdeJar(SamplingAlgorithm samplingAlgorithm, int tVaue, int configLimit) {
         try {
             Path basePath = Paths.get("").toAbsolutePath();
-            Path jarPath = basePath.resolve("app/libs/app-1.0.0-all.jar").normalize();
+            Path jarPath = basePath.resolve("app/libs/feature_ide_helper-1.0.0-all.jar").normalize();
             Path cnfPath = basePath.resolve("cnf.json").normalize();
             Path resultsPath = basePath.resolve("results.json").normalize();
             String sampler = samplingAlgorithm.toString();
