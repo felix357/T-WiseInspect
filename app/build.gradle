@@ -70,9 +70,19 @@ jar {
 }
 
 shadowJar {
-    archiveBaseName.set('app')
+    archiveBaseName.set('t-wise-sampling')
+    archiveVersion.set('1.0')
     archiveClassifier.set('')
-    archiveVersion.set('')
+    mergeServiceFiles {
+        include 'META-INF/services/**'
+    }
+
+    from('src/main/resources') {
+        include 'extensions.xml'
+        into ''
+    }
+
+    configurations = [project.configurations.runtimeClasspath]
 }
 
 tasks.named('test') {
