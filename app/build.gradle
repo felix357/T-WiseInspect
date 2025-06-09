@@ -70,7 +70,7 @@ jar {
 }
 
 shadowJar {
-    archiveBaseName.set('t-wise-sampling')
+    archiveBaseName.set('T-WiseInspect')
     archiveVersion.set('1.0')
     archiveClassifier.set('')
     mergeServiceFiles {
