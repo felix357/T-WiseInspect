@@ -3,7 +3,8 @@
     <point id="de.featjar.formula.io.FormulaFormats">
         <extension id="de.featjar.formula.io.xml.XMLFeatureModelFormulaFormat"/>
     </point>
-     <point id="de.featjar.analysis.ddnnife.bin.DdnnifeBinary">
-        <extension id="de.featjar.analysis.ddnnife.bin.D4Binary"/>
+    <point id="de.featjar.base.env.Binaries">
+        <extension id="de.featjar.analysis.ddnnife.bin.DdnnifeBinary" />
+        <extension id="de.featjar.analysis.ddnnife.bin.D4Binary" />
     </point>
 </extensions>
