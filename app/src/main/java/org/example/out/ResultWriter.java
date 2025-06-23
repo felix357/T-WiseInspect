@@ -134,7 +134,7 @@ public class ResultWriter {
             // Write header only if file is new
             if (!fileExists) {
                 csvWriter.write(
-                        "Sampler,t,Num_Configs,Total_Covered_Twise,Uncovered_Twise,Invalid_Twise,Coverage,Covered_Exactly_Once,Num_Configs_in_Percent\n");
+                        "Sampler,t,Num_Configs,Total_Covered_Twise,Uncovered_Twise,Invalid_Twise,Coverage,Covered_Exactly_Once\n");
             }
 
             String line = String.format(Locale.US, "%s,%d,%d,%d,%d,%d,%.4f,%d\n",
