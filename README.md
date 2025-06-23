@@ -87,11 +87,3 @@ Here is an example of how to run the tool with all required parameters:
 
 ## Output
 The output will be a file containing the statistics of the resulting configurations, including various metrics relevant to the chosen sampling algorithm.
-
-## Run as JAR
-
-Wenn du das Tool als ausführbare JAR-Datei verwendest, musst du sicherstellen, dass sich eine zusätzliche Bibliothek im gleichen Verzeichnis wie die ausgeführte JAR befindet.
-
-### Erforderliche Datei
-
-Im Verzeichnis der auszuführenden JAR-Datei (`T-WiseInspect-1.0.jar`) muss sich zusätzlich folgende Datei befinden:
