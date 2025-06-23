@@ -12,10 +12,19 @@ The **T-WiseInspect** tool analyzes feature models to generate representative co
 1. Clone this repository: ```git clone https://github.com/felix357/T-WiseInspect.git```
 2. After cloning navigate to the project directory: ```cd T-WiseInspect```
 3. Build the project using gradle: ``` ./gradlew clean shadowJar```
-4. The JAR file will be located in the ```app/build/libs``` folder and will be named ```app.jar```
-5. Once the project is built, you can run the executable JAR file from the command line using Java. ```cd build/libs``` ```java -jar T-WiseInspect-1.0.jar --input-file /path/to/input.xml --sampling-algorithm YASA --output /path/to/output/statistics.txt```
-6. Ensure that you have Java 21 or later installed.
-7. Ensure that you have Gradle 8 or later installed. 
+4. The JAR file will be located in the ```app/build/libs``` folder and will be named ```T-WiseInspect-1.0.jar```
+5. Ensure that you have Java 21 or later installed.
+6. Ensure that you have Gradle 8 or later installed.
+
+
+## Run as JAR
+For `T-WiseInspect-1.0.jar` to run correctly, the following library must be present in the **same directory**:
+`/app/libs/feature_ide_helper-1.0.0-all.jar`
+
+This library can be copied from the project directory:
+`T-WiseInspect/app/libs/feature_ide_helper-1.0.0-all.jar`
+
+Afterwards you can run the JAR using: ```java -jar T-WiseInspect-1.0.jar --input-file /path/to/input.xml --sampling-algorithm YASA --output /path/to/output/statistics.txt```
 
 ## Features
 - Reads and processes a Feature Model from an XML file.
